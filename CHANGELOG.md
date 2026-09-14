@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.1.1...v0.2.0) (2026-09-14)
+
+
+### Features
+
+* **docs:** add Sphinx documentation site ([989e397](https://github.com/dlly11/python-c-monorepo-template/commit/989e39708ede08d03314588c6e6994ffa8a2f38b))
+
+
+### Bug Fixes
+
+* **ci:** use Bash for native release steps ([fc9eac0](https://github.com/dlly11/python-c-monorepo-template/commit/fc9eac00995b15c2a5f049299a8c27305a25a309))
+
 ## [0.1.1](https://github.com/dlly11/python-c-monorepo-template/compare/v0.1.0...v0.1.1) (2026-09-14)
 
 
