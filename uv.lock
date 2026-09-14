@@ -343,12 +343,12 @@ wheels = [
 
 [[package]]
 name = "example-core"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "python/packages/core" }
 
 [[package]]
 name = "example-package-a"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "python/packages/package_a" }
 dependencies = [
     { name = "example-core" },
@@ -359,7 +359,7 @@ requires-dist = [{ name = "example-core", editable = "python/packages/core" }]
 
 [[package]]
 name = "example-package-a-cli"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "python/apps/package_a_cli" }
 dependencies = [
     { name = "example-package-a" },
@@ -370,7 +370,7 @@ requires-dist = [{ name = "example-package-a", editable = "python/packages/packa
 
 [[package]]
 name = "example-package-b"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "python/packages/package_b" }
 dependencies = [
     { name = "example-core" },
@@ -658,7 +658,7 @@ wheels = [
 
 [[package]]
 name = "python-c-monorepo-template"
-version = "0.1.1"
+version = "0.2.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
