@@ -1,0 +1,93 @@
+[project]
+name = "python-c-monorepo-template"
+version = "0.1.0"
+description = "Production-oriented template for Python and C projects in one monorepo."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "python/packages/*",
+  "python/apps/*",
+]
+
+[tool.uv.sources]
+example-core = { workspace = true }
+example-package-a = { workspace = true }
+example-package-b = { workspace = true }
+example-package-a-cli = { workspace = true }
+
+[dependency-groups]
+test = [
+  "pytest>=8.4",
+  "pytest-cov>=6.2",
+]
+lint = [
+  "pre-commit>=4.2",
+  "ruff>=0.16.1",
+  "ty>=0.0.80",
+]
+dev = [
+  { include-group = "lint" },
+  { include-group = "test" },
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # import sorting
+  "UP",  # Python upgrades
+  "B",   # bugbear
+  "SIM", # simplifications
+  "RUF", # Ruff-specific checks
+  "S",   # common security issues
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+"scripts/**" = ["S603", "S607"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "example_core",
+  "example_package_a",
+  "example_package_a_cli",
+  "example_package_b",
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["python"]
+addopts = "--import-mode=importlib --strict-config --strict-markers --cov --cov-report=term-missing"
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+source = [
+  "example_core",
+  "example_package_a",
+  "example_package_b",
+  "example_package_a_cli",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_also = [
+  'if __name__ == "__main__":',
+  "raise NotImplementedError",
+]

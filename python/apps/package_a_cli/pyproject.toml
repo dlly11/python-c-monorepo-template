@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "example-package-a-cli"
+version = "0.1.0"
+description = "Example CLI application consuming example-package-a."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["example-package-a>=0.1.0"]
+
+[project.scripts]
+package-a-cli = "example_package_a_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+example_package_a_cli = ["py.typed"]

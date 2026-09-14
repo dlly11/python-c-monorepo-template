@@ -1,0 +1,52 @@
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.1
+    hooks:
+      - id: uv-lock
+
+  - repo: local
+    hooks:
+      - id: version-consistency
+        name: repository version consistency
+        entry: uv run python scripts/check_versions.py
+        language: system
+        pass_filenames: false
+        files: ^(version\.txt|uv\.lock|CMakeLists\.txt|pyproject\.toml|python/.*/pyproject\.toml)$
+
+      - id: ty
+        name: ty (all Python workspace members)
+        entry: uv run python scripts/check_python.py
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: clang-format
+        name: clang-format check
+        entry: clang-format --dry-run --Werror
+        language: system
+        types_or: [c, c++]
+
+      - id: cppcheck
+        name: cppcheck
+        entry: cppcheck --enable=warning,style,performance,portability --std=c17 --error-exitcode=1 --suppress=missingIncludeSystem
+        language: system
+        types_or: [c, c++]
