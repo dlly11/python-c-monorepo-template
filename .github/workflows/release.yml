@@ -112,6 +112,9 @@ jobs:
     needs: release-please
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
     strategy:
