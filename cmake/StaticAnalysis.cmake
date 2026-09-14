@@ -45,9 +45,10 @@ endfunction()
 
 function(monorepo_add_clang_format_targets)
   file(
-    GLOB_RECURSE monorepo_c_sources
+    GLOB_RECURSE monorepo_native_sources
     CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/native/*.c"
+    "${PROJECT_SOURCE_DIR}/native/*.cpp"
     "${PROJECT_SOURCE_DIR}/native/*.h"
   )
 
@@ -59,14 +60,14 @@ function(monorepo_add_clang_format_targets)
 
   add_custom_target(
     format-c
-    COMMAND "${clang_format_executable}" -i ${monorepo_c_sources}
-    COMMENT "Formatting C sources with clang-format"
+    COMMAND "${clang_format_executable}" -i ${monorepo_native_sources}
+    COMMENT "Formatting first-party native sources with clang-format"
     VERBATIM
   )
   add_custom_target(
     format-c-check
-    COMMAND "${clang_format_executable}" --dry-run --Werror ${monorepo_c_sources}
-    COMMENT "Checking C formatting with clang-format"
+    COMMAND "${clang_format_executable}" --dry-run --Werror ${monorepo_native_sources}
+    COMMENT "Checking first-party native formatting with clang-format"
     VERBATIM
   )
 endfunction()

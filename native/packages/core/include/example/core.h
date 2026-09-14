@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Status returned by the example native APIs. */
 typedef enum example_status {
     /** The operation completed successfully. */
@@ -34,5 +38,9 @@ example_status example_core_format_message(const char *prefix, const char *name,
  * @return A pointer to a static, null-terminated string.
  */
 const char *example_core_status_string(example_status status);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

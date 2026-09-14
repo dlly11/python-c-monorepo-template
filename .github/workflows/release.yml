@@ -135,6 +135,7 @@ jobs:
           cmake --preset release
           cmake --build --preset release
           cmake --install build/release --prefix stage
+          python scripts/check_native_install.py stage
           cmake -E make_directory dist
       - name: Create the native archive
         env:

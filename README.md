@@ -2,7 +2,7 @@
 
 A practical starting point maintaining multiple Python and C deliverables
 in one repository. Python uses uv workspaces, setuptools, Ruff, ty, and pytest. Native code uses
-CMake, CTest, clang-format, clang-tidy, and cppcheck.
+CMake, CTest, CppUTest, clang-format, clang-tidy, and cppcheck.
 
 The example is deliberately small but real: both language stacks implement the same component
 graph, compile or install independently, and have tests at each boundary.
@@ -54,6 +54,7 @@ See [the architecture guide](docs/architecture.md) for package boundaries and de
 - CMake 3.25 or newer
 - Ninja
 - A C17 compiler: Clang, GCC, or MSVC
+- A C++17 compiler for native test builds
 - clang-format, clang-tidy, and cppcheck for native quality checks
 - GCC and gcov for native coverage checks
 - Doxygen 1.9.2 or newer for documentation builds
@@ -88,7 +89,18 @@ cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ./build/dev/native/apps/package_a_cli/package-a-cli Ada
+./build/dev/native/apps/package_a_cli/package-a-cli --version
 ```
+
+Test-enabled builds fetch the SHA-256-pinned CppUTest 4.0 source archive. Restricted environments
+can supply an approved local source tree without changing project files:
+
+```bash
+cmake --preset dev -DFETCHCONTENT_SOURCE_DIR_CPPUTEST=/approved/sources/cpputest
+```
+
+Set `FETCHCONTENT_FULLY_DISCONNECTED=ON` as well when configuration must not attempt any network
+access. Release builds use `BUILD_TESTING=OFF`, do not fetch CppUTest, and require only a C compiler.
 
 Run the complete static-analysis build:
 
@@ -160,7 +172,8 @@ compilation-database-aware clang-tidy analysis remains in the CMake analysis pre
 
 ## Versioning and releases
 
-All Python and native components share one Semantic Versioning release number. Release Please
+All Python and native components share one Semantic Versioning release number. Native CMake builds
+generate and install a version header for each library and the CLI from that value. Release Please
 uses Conventional Commit pull request titles to maintain a reviewable release pull request,
 changelog, `vX.Y.Z` tag, and GitHub Release. The release workflow also attaches Python
 distributions and cross-platform native install archives.

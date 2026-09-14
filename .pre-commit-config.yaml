@@ -43,10 +43,10 @@ repos:
         name: clang-format check
         entry: clang-format --dry-run --Werror
         language: system
-        types_or: [c, c++]
+        files: ^native/.*\.(c|cpp|h)$
 
       - id: cppcheck
         name: cppcheck
-        entry: cppcheck --enable=warning,style,performance,portability --std=c17 --error-exitcode=1 --suppress=missingIncludeSystem
+        entry: cppcheck --enable=warning,style,performance,portability --language=c --std=c17 --error-exitcode=1 --suppress=missingIncludeSystem
         language: system
-        types_or: [c, c++]
+        files: ^native/.*\.(c|h)$

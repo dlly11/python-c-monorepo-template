@@ -87,7 +87,7 @@ def main() -> int:
     NATIVE_REPORT_ROOT.mkdir(parents=True)
 
     failures: list[str] = []
-    required_tools = ("pytest", "cmake", "ctest", "ninja", "gcc", "gcov", "gcovr")
+    required_tools = ("pytest", "cmake", "ctest", "ninja", "gcc", "g++", "gcov", "gcovr")
     missing_tools = [tool for tool in required_tools if shutil.which(tool) is None]
     if missing_tools:
         failures.append(f"missing tools: {', '.join(missing_tools)}")

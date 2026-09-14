@@ -14,8 +14,19 @@ include(CMakePackageConfigHelpers)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ProjectOptions)
 include(StaticAnalysis)
+include(VersionHeaders)
 
 monorepo_add_clang_format_targets()
+
+if(BUILD_TESTING)
+  enable_language(CXX)
+  include(CppUTest)
+  monorepo_add_cpputest()
+
+  add_library(example_cpputest_main STATIC native/tests/cpputest_main.cpp)
+  target_link_libraries(example_cpputest_main PUBLIC CppUTest::CppUTest)
+  monorepo_set_cpp_test_options(example_cpputest_main)
+endif()
 
 add_subdirectory(native/packages/core)
 add_subdirectory(native/packages/package_a)

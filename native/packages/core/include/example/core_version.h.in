@@ -1,0 +1,16 @@
+#ifndef EXAMPLE_CORE_VERSION_H
+#define EXAMPLE_CORE_VERSION_H
+
+/** Core library major version. */
+#define EXAMPLE_CORE_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+
+/** Core library minor version. */
+#define EXAMPLE_CORE_VERSION_MINOR @PROJECT_VERSION_MINOR@
+
+/** Core library patch version. */
+#define EXAMPLE_CORE_VERSION_PATCH @PROJECT_VERSION_PATCH@
+
+/** Core library semantic version string. */
+#define EXAMPLE_CORE_VERSION "@PROJECT_VERSION@"
+
+#endif

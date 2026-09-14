@@ -2,7 +2,8 @@ PROJECT_NAME           = "Python and C Monorepo Template"
 OUTPUT_DIRECTORY       = build/docs/doxygen
 INPUT                  = native/packages/core/include \
                          native/packages/package_a/include \
-                         native/packages/package_b/include
+                         native/packages/package_b/include \
+                         build/docs/native/generated/include
 FILE_PATTERNS           = *.h
 RECURSIVE               = YES
 

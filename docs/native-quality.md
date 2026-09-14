@@ -2,7 +2,8 @@
 
 ## clang-format
 
-`.clang-format` is the single source of formatting policy for C source and headers.
+`.clang-format` is the single source of formatting policy for production C, public headers, and
+CppUTest C++ sources.
 
 ```bash
 cmake --build --preset dev --target format-c
@@ -35,3 +36,14 @@ suppressed because those headers are owned by the selected compiler toolchain.
 
 Compiler warnings are errors in `dev`, `analysis`, and `asan`. Release consumers do not inherit
 the repository's private warning flags.
+
+## CppUTest dependency policy
+
+Native library tests use the core CppUTest framework and continue to run through CTest. CMake
+downloads the pinned 4.0 archive only for test-enabled builds, verifies its SHA-256 digest, and
+keeps the dependency outside the default install/export set. CppUMock and the extension library
+are intentionally disabled until a component has a concrete mocking requirement.
+
+For an approved internal copy, set `FETCHCONTENT_SOURCE_DIR_CPPUTEST` to its extracted source
+directory. Combine that override with `FETCHCONTENT_FULLY_DISCONNECTED=ON` for offline builds.
+Static analysis and coverage target first-party sources rather than downloaded dependency code.

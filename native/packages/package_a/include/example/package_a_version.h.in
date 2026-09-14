@@ -1,0 +1,16 @@
+#ifndef EXAMPLE_PACKAGE_A_VERSION_H
+#define EXAMPLE_PACKAGE_A_VERSION_H
+
+/** Package A library major version. */
+#define EXAMPLE_PACKAGE_A_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+
+/** Package A library minor version. */
+#define EXAMPLE_PACKAGE_A_VERSION_MINOR @PROJECT_VERSION_MINOR@
+
+/** Package A library patch version. */
+#define EXAMPLE_PACKAGE_A_VERSION_PATCH @PROJECT_VERSION_PATCH@
+
+/** Package A library semantic version string. */
+#define EXAMPLE_PACKAGE_A_VERSION "@PROJECT_VERSION@"
+
+#endif

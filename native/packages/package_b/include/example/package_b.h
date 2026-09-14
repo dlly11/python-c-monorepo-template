@@ -5,6 +5,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Create a farewell using the shared core formatter.
  *
@@ -14,5 +18,9 @@
  * @return EXAMPLE_STATUS_OK on success, or a status describing the failure.
  */
 example_status example_package_b_farewell(const char *name, char *output, size_t output_capacity);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

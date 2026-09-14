@@ -20,6 +20,14 @@ int main(void) {
 }
 ```
 
+Read the configured library version at compile time:
+
+```c
+#include <example/core_version.h>
+
+const char *core_version = EXAMPLE_CORE_VERSION;
+```
+
 Within this repository, save the example as `example.c` and compile it directly with:
 
 ```bash

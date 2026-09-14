@@ -48,19 +48,23 @@ site assembles those pages without moving component-specific guidance into a cen
 
 ## Native conventions
 
-Native libraries expose headers under a namespaced include tree such as
-`<example/package_a.h>`. Consumers link through namespaced CMake aliases:
+Native libraries expose behavioural and generated version headers under a namespaced include tree,
+such as `<example/package_a.h>` and `<example/package_a_version.h>`. Consumers link through
+namespaced CMake aliases:
 
 ```cmake
 target_link_libraries(my_target PRIVATE example::package_a)
 ```
 
-Each target receives warnings, the C17 requirement, optional sanitizers, and static-analysis
-integration through `monorepo_set_project_options`. Target-level policy avoids leaking internal
-compiler flags into external consumers.
+Each production target receives warnings, the C17 requirement, optional sanitizers, and
+static-analysis integration through `monorepo_set_project_options`. CppUTest targets receive the
+corresponding test-only C++17 policy. Target-level policy avoids leaking internal compiler flags
+into external consumers.
 
-Native tests are dependency-free executables registered with CTest. A real organization can
-replace these with its approved C test framework without changing the component layout.
+Native library tests use CppUTest and are registered with CTest; application boundary tests remain
+direct CTest process checks. CppUTest is fetched only for test-enabled builds and is excluded from
+installed artifacts. Public C headers use `extern "C"` guards so both the harness and downstream
+C++ programs can link to the C implementation.
 
 ## Adding a Python package
 
@@ -75,10 +79,13 @@ replace these with its approved C test framework without changing the component 
 
 1. Create `native/packages/<name>/{include,src,tests}`.
 2. Define a library and namespaced alias in its `CMakeLists.txt`.
-3. Apply `monorepo_set_project_options` to every library, executable, and test target.
-4. Link only to explicitly declared targets.
-5. Add the directory to the root `CMakeLists.txt`.
-6. Run the developer, analysis, and sanitizer presets.
+3. Add a component-owned version-header template and register it with
+   `monorepo_add_version_header`.
+4. Apply `monorepo_set_project_options` to production C targets and
+   `monorepo_set_cpp_test_options` to CppUTest executables.
+5. Link only to explicitly declared targets and register the test with CTest.
+6. Add the directory to the root `CMakeLists.txt`.
+7. Run the developer, analysis, sanitizer, and coverage presets.
 
 ## Cross-language integration
 

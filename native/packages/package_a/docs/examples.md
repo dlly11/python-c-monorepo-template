@@ -18,6 +18,14 @@ int main(void) {
 }
 ```
 
+Read the configured package version at compile time:
+
+```c
+#include <example/package_a_version.h>
+
+const char *package_a_version = EXAMPLE_PACKAGE_A_VERSION;
+```
+
 Within this repository, save the example as `example.c` and compile it directly with:
 
 ```bash

@@ -13,9 +13,14 @@ BUILD_ROOT = ROOT / "build/docs"
 
 def main() -> int:
     """Generate Doxygen XML and build warning-free Sphinx HTML."""
-    doxygen = shutil.which("doxygen")
-    if doxygen is None:
-        print("documentation build failed: doxygen is not installed", file=sys.stderr)
+    required_tools = ("cmake", "doxygen", "ninja")
+    tools = {tool: shutil.which(tool) for tool in required_tools}
+    missing_tools = [tool for tool, path in tools.items() if path is None]
+    if missing_tools:
+        print(
+            f"documentation build failed: missing tools: {', '.join(missing_tools)}",
+            file=sys.stderr,
+        )
         return 1
 
     if BUILD_ROOT.exists():
@@ -24,7 +29,21 @@ def main() -> int:
 
     try:
         subprocess.run(
-            [doxygen, str(ROOT / "tools/doxygen/Doxyfile")],
+            [
+                str(tools["cmake"]),
+                "-S",
+                str(ROOT),
+                "-B",
+                str(BUILD_ROOT / "native"),
+                "-G",
+                "Ninja",
+                "-DBUILD_TESTING=OFF",
+            ],
+            cwd=ROOT,
+            check=True,
+        )
+        subprocess.run(
+            [str(tools["doxygen"]), str(ROOT / "tools/doxygen/Doxyfile")],
             cwd=ROOT,
             check=True,
         )

@@ -57,6 +57,7 @@
       "binaryDir": "${sourceDir}/build/coverage/native",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
         "ENABLE_COVERAGE": "ON"
       },
       "condition": {
