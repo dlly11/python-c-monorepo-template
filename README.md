@@ -55,6 +55,7 @@ See [the architecture guide](docs/architecture.md) for package boundaries and de
 - Ninja
 - A C17 compiler: Clang, GCC, or MSVC
 - clang-format, clang-tidy, and cppcheck for native quality checks
+- GCC and gcov for native coverage checks
 - Doxygen 1.9.2 or newer for documentation builds
 
 The compiler and native analysis tools are intentionally system dependencies. Installing them
@@ -111,6 +112,22 @@ cmake --preset asan
 cmake --build --preset asan
 ctest --preset asan
 ```
+
+## Coverage
+
+Python coverage is branch-aware and must remain at or above 90% aggregate coverage. Native C
+coverage must remain at or above 90% line and 80% branch coverage. Generate both report sets with
+one command:
+
+```bash
+uv sync --locked --all-packages --group coverage
+uv run --group coverage python scripts/check_coverage.py
+```
+
+Annotated HTML, machine-readable reports, and a combined summary are written beneath
+`build/coverage/reports`. Native coverage uses the Linux/GCC-only `coverage` CMake preset; the
+normal native matrix remains compiler- and platform-independent. See the
+[testing and coverage guide](docs/testing.md) for report details and CI policy.
 
 ## Documentation
 

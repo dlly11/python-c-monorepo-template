@@ -12,6 +12,8 @@ uv run ruff format --check .
 uv run python scripts/check_python.py
 uv run python scripts/check_versions.py
 uv run pytest
+uv sync --locked --all-packages --group coverage
+uv run --group coverage python scripts/check_coverage.py
 uv sync --locked --all-packages --group docs
 uv run --group docs python scripts/build_docs.py
 

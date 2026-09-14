@@ -41,6 +41,10 @@ docs = [
   "sphinx>=9.1,<10",
   "sphinxcontrib-mermaid>=2.0,<3",
 ]
+coverage = [
+  { include-group = "test" },
+  "gcovr>=8.6,<9",
+]
 
 [tool.ruff]
 line-length = 100

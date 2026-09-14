@@ -7,6 +7,7 @@ without weakening their normal developer experience.
   workflow passes both paths explicitly.
 - `sphinx/` configures the repository-wide MyST, Mermaid, autodoc, and Breathe documentation site.
 - `doxygen/` configures XML generation for the public native C headers consumed by Breathe.
+- `coverage/` defines gcovr source filtering and the native line and branch thresholds.
 
 Configuration based on conventional discovery remains at the repository root. In particular,
 Clang tooling, EditorConfig, Git, pre-commit, uv, and CMake integrations expect their standard

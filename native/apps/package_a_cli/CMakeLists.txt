@@ -11,4 +11,15 @@ if(BUILD_TESTING)
 
   add_test(NAME c.package_a_cli.usage COMMAND example_package_a_cli)
   set_tests_properties(c.package_a_cli.usage PROPERTIES WILL_FAIL TRUE)
+
+  string(REPEAT "x" 256 package_a_cli_oversized_name)
+  add_test(
+    NAME c.package_a_cli.buffer_too_small
+    COMMAND example_package_a_cli "${package_a_cli_oversized_name}"
+  )
+  set_tests_properties(
+    c.package_a_cli.buffer_too_small
+    PROPERTIES
+      PASS_REGULAR_EXPRESSION "buffer too small"
+  )
 endif()

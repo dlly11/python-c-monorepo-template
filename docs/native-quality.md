@@ -30,6 +30,7 @@ suppressed because those headers are owned by the selected compiler toolchain.
 | `dev` | Normal local builds | Available separately; not required |
 | `analysis` | Pull requests and release qualification | clang-tidy and cppcheck required |
 | `asan` | Runtime defect detection | AddressSanitizer and UndefinedBehaviorSanitizer |
+| `coverage` | Native test effectiveness | GCC/gcov line and branch coverage |
 | `release` | Optimized artifacts | Tests and analysis performed in earlier stages |
 
 Compiler warnings are errors in `dev`, `analysis`, and `asan`. Release consumers do not inherit

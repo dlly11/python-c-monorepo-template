@@ -63,7 +63,33 @@ jobs:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked --all-packages
-      - run: uv run pytest
+      - run: uv run pytest --no-cov
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --locked --all-packages --group coverage
+      - run: uv run --group coverage python scripts/check_coverage.py
+      - name: Publish coverage summary
+        if: always() && hashFiles('build/coverage/reports/summary.md') != ''
+        run: cat build/coverage/reports/summary.md >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports
+          path: build/coverage/reports
+          if-no-files-found: warn
+          retention-days: 14
 
   documentation:
     name: Documentation
