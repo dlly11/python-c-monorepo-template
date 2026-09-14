@@ -126,10 +126,7 @@ jobs:
         run: |
           cmake --install build/dev --prefix build/dev/stage
           python scripts/check_native_install.py build/dev/stage
-          cmake -S native/tests/install_consumer \
-            -B build/install-consumer \
-            -G Ninja \
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/dev/stage"
+          cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/dev/stage"
           cmake --build build/install-consumer
           ctest --test-dir build/install-consumer --output-on-failure
 
