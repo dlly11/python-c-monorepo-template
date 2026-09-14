@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.2.0...v0.3.0) (2026-09-14)
+
+
+### Features
+
+* **coverage:** enforce Python and C coverage ([44ffbf4](https://github.com/dlly11/python-c-monorepo-template/commit/44ffbf4d8d8a1980864c6fdbbeb084082261add1))
+
 ## [0.2.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.1.1...v0.2.0) (2026-09-14)
 
 
