@@ -31,8 +31,9 @@ core ──> package_a ──> package_a_cli
 │   └── apps/
 │       └── package_a_cli/
 ├── cmake/                       # shared compiler and analysis policy
-├── docs/releases.md             # lockstep version and release policy
+├── docs/                        # architecture, contribution, security, and release guidance
 ├── scripts/                     # repository-level orchestration
+├── tools/                       # explicitly located tool configuration
 ├── CMakeLists.txt               # native build graph
 ├── CMakePresets.json            # dev, analysis, sanitizer, and release builds
 ├── pyproject.toml               # uv workspace and shared Python policy

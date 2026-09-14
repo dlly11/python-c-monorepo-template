@@ -84,5 +84,6 @@ ordinary workflow events caused by that token, so the release workflow deliberat
 `workflow_dispatch` for CI after synchronizing the release branch. No long-lived personal access
 token is required.
 
-The files `release-please-config.json` and `.release-please-manifest.json` are Release Please state.
-Change their structure only as part of an intentional release-policy migration.
+The files `tools/release-please/config.json` and `tools/release-please/manifest.json` are Release
+Please policy and state. Change their structure only as part of an intentional release-policy
+migration.

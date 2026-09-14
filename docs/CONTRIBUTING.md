@@ -21,7 +21,7 @@ ctest --preset analysis
 
 Use a Conventional Commit pull request title such as `feat(package-a): add JSON output`; the
 repository assumes squash merges and Release Please uses the resulting commit to calculate the
-next version. See [the release guide](docs/releases.md) for the allowed types and release process.
+next version. See [the release guide](releases.md) for the allowed types and release process.
 
 Include tests for observable behaviour. Changes to public Python APIs, C headers, command-line
 interfaces, or persistent formats require an explicit compatibility note in the pull request and
