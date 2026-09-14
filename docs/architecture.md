@@ -4,21 +4,16 @@
 
 Both language stacks demonstrate the same dependency direction:
 
-```text
-              ┌───────────┐
-              │   core    │
-              └─────┬─────┘
-                    │
-             ┌──────┴──────┐
-             ▼             ▼
-       ┌───────────┐ ┌───────────┐
-       │ package_a │ │ package_b │
-       └─────┬─────┘ └───────────┘
-             │
-             ▼
-     ┌───────────────┐
-     │ package_a_cli │
-     └───────────────┘
+```mermaid
+flowchart TD
+    core[core]
+    packageA[package_a]
+    packageB[package_b]
+    packageACLI[package_a_cli]
+
+    core --> packageA
+    core --> packageB
+    packageA --> packageACLI
 ```
 
 - `core` defines shared value types, status contracts, and low-level utilities.
@@ -47,6 +42,9 @@ Use normalized distribution names and unambiguous organization-prefixed import n
 
 Every dependency must appear in the consuming member's `[project].dependencies`, even though a
 shared development environment may make undeclared imports appear to work locally.
+
+Each component owns documentation beneath its own `docs` directory. The repository-level Sphinx
+site assembles those pages without moving component-specific guidance into a central hierarchy.
 
 ## Native conventions
 

@@ -65,6 +65,22 @@ jobs:
       - run: uv sync --locked --all-packages
       - run: uv run pytest
 
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install --yes doxygen
+      - run: uv sync --locked --all-packages --group docs
+      - run: uv run --group docs python scripts/build_docs.py
+
   native-build:
     name: Native build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

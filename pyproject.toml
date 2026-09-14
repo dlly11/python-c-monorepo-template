@@ -34,6 +34,13 @@ dev = [
   { include-group = "lint" },
   { include-group = "test" },
 ]
+docs = [
+  "breathe>=4.36,<5",
+  "furo>=2025.7.19",
+  "myst-parser>=5.0,<6",
+  "sphinx>=9.1,<10",
+  "sphinxcontrib-mermaid>=2.0,<3",
+]
 
 [tool.ruff]
 line-length = 100
