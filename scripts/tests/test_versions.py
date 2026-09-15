@@ -158,3 +158,84 @@ def test_new_member_is_discovered_by_version_setter_and_type_checks(
     scripts["set_version"].update_version(repository, "2.0.0")
     assert 'version = "2.0.0"' in metadata.read_text()
     assert scripts["repository_metadata"].version_errors(repository, "2.0.0") == []
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "project(sample VERSION 1.2.3 LANGUAGES C)",
+        'PROJECT(\n sample\n VERSION "1.2.3" # x-release-please-version\n LANGUAGES C\n)',
+        'project(sample DESCRIPTION "VERSION 9.9.9 and project(fake VERSION 8.8.8)" VERSION 1.2.3)',
+        "project(sample DESCRIPTION [=[) VERSION 9.9.9 (]=] VERSION [=[1.2.3]=])",
+        "project(sample VERSION [[\n1.2.3]])",
+        "project(sample VERSION 1.2.3)\r\n",
+    ],
+)
+def test_cmake_version_update_only_changes_project_literal(
+    repository: Path,
+    scripts: dict[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+    declaration: str,
+) -> None:
+    contents = (
+        "cmake_minimum_required(VERSION 3.25.1)\n"
+        "# project(ignored VERSION 1.2.3)\n"
+        "#[=[\nproject(also_ignored VERSION 6.6.6)\n]=]\n"
+        'set(unrelated "project(fake VERSION 5.5.5)")\n' + declaration + "\n"
+    )
+    cmake = repository / "CMakeLists.txt"
+    cmake.write_bytes(contents.encode())
+    metadata = scripts["repository_metadata"]
+    assert metadata.cmake_version(repository) == "1.2.3"
+
+    def refresh(*args: object, **kwargs: object) -> None:
+        lock = repository / "uv.lock"
+        lock.write_text(lock.read_text().replace("1.2.3", "2.0.0"), encoding="utf-8")
+
+    monkeypatch.setattr(subprocess, "run", refresh)
+    scripts["set_version"].update_version(repository, "2.0.0")
+    assert (
+        cmake.read_bytes()
+        == contents.replace(declaration, declaration.replace("1.2.3", "2.0.0")).encode()
+    )
+    assert metadata.version_errors(repository, "2.0.0") == []
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "cmake_minimum_required(VERSION 3.25.1)",
+        "project(sample LANGUAGES C)",
+        "project(sample VERSION)",
+        "project(sample VERSION 1.2.3 VERSION 2.3.4)",
+        "project(first VERSION 1.2.3)\nproject(second VERSION 1.2.3)",
+        "set(v 1.2.3)\nproject(sample VERSION ${v})",
+        'project(sample VERSION "${v}")',
+        "project(sample VERSION 1.2)",
+        "project(sample VERSION 01.2.3)",
+        'project(sample VERSION"1.2.3")',
+        'project(sample VERSION 1.2."3")',
+        "project(sample VERSION 1.2.3",
+        'project(sample VERSION "1.2.3)',
+        "project(sample VERSION [[1.2.3)",
+        "#[[project(sample VERSION 1.2.3)",
+        ")\nproject(sample VERSION 1.2.3)",
+        "project(sample VERSION (1.2.3))",
+    ],
+)
+def test_invalid_cmake_project_is_rejected_before_any_writes(
+    repository: Path,
+    scripts: dict[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+    contents: str,
+) -> None:
+    (repository / "CMakeLists.txt").write_text(contents, encoding="utf-8")
+    before = snapshot(repository)
+    run = Mock()
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
+        scripts["repository_metadata"].cmake_version(repository)
+    with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
+        scripts["set_version"].update_version(repository, "2.0.0")
+    assert snapshot(repository) == before
+    run.assert_not_called()
