@@ -48,6 +48,11 @@ empty input. Linux additionally checks that greeting and version output fail whe
 
 ## Repository script tests
 
+Workflow regression tests mock GitHub API reads to verify release eligibility, stale/pending/failed
+CI handling, manual and fork PR-title context, and GitHub policy drift. They run in the existing
+pytest suite without network access or additional CI jobs. Live settings audits are manual and
+read-only; see [the release guide](releases.md).
+
 The normal `uv run pytest` command also discovers `scripts/tests`. These tests cover version
 validation, version-update rollback, native install validation, commit/PR-title syntax, wheel isolation,
 workspace registration consistency, and workstation diagnostics. Temporary-workspace tests cover

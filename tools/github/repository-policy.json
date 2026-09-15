@@ -1,0 +1,38 @@
+{
+  "repository": {
+    "default_branch": "main",
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "allow_squash_merge": true,
+    "squash_merge_commit_title": "PR_TITLE",
+    "squash_merge_commit_message": "COMMIT_MESSAGES"
+  },
+  "protection": {
+    "enforce_admins": {"enabled": true},
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 0,
+      "require_code_owner_reviews": false,
+      "require_last_push_approval": false
+    },
+    "required_status_checks": {
+      "strict": true,
+      "checks": [
+        {"context": "Python quality", "app_id": 15368},
+        {"context": "Conventional PR title", "app_id": 15368},
+        {"context": "Python 3.12", "app_id": 15368},
+        {"context": "Python 3.13", "app_id": 15368},
+        {"context": "Python 3.14", "app_id": 15368},
+        {"context": "Coverage", "app_id": 15368},
+        {"context": "Documentation", "app_id": 15368},
+        {"context": "Native build (ubuntu-latest)", "app_id": 15368},
+        {"context": "Native build (macos-latest)", "app_id": 15368},
+        {"context": "Native build (windows-latest)", "app_id": 15368},
+        {"context": "Native static analysis", "app_id": 15368},
+        {"context": "Native sanitizers", "app_id": 15368}
+      ]
+    },
+    "required_linear_history": {"enabled": true},
+    "allow_force_pushes": {"enabled": false},
+    "allow_deletions": {"enabled": false}
+  }
+}

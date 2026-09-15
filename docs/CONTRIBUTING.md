@@ -49,14 +49,24 @@ Manual checks:
 
 ```bash
 uv run python scripts/check_pr_title.py "feat(package-a): add JSON output"
-uv run python scripts/check_commits.py --message-file .git/COMMIT_EDITMSG
+COMMIT_MESSAGE_FILE=$(git rev-parse --git-path COMMIT_EDITMSG)
+uv run python scripts/check_commits.py --message-file "${COMMIT_MESSAGE_FILE}"
 git fetch origin
 uv run python scripts/check_commits.py --base origin/main --head HEAD
 ```
 
 `pre-commit run --all-files` runs file checks; it does not check a commit message. To exercise the
-message hook directly, use
-`uv run pre-commit run conventional-commit --hook-stage commit-msg --commit-msg-filename .git/COMMIT_EDITMSG`.
+message hook directly, use the same resolved path:
+
+```bash
+COMMIT_MESSAGE_FILE=$(git rev-parse --git-path COMMIT_EDITMSG)
+uv run pre-commit run conventional-commit --hook-stage commit-msg --commit-msg-filename "${COMMIT_MESSAGE_FILE}"
+```
+
+These shell examples use Bash (including Git Bash on Windows). Git resolves the correct path for
+both ordinary clones and linked worktrees, where `.git` is a file. `COMMIT_EDITMSG` exists after a
+commit attempt; before then, create a temporary text file containing your proposed subject and
+pass its path instead. Quoting the path also supports directories containing spaces.
 
 If a new commit is rejected, correct its subject and retry. For the latest existing commit, use
 `git commit --amend -m "fix(core): handle empty input"`. For older commits on your PR branch, use
@@ -71,6 +81,10 @@ skipped. The separate **Conventional PR title** check reruns on title edits with
 build matrix. Merge with **Squash and merge**, keeping the validated PR title as the resulting
 commit subject; Release Please uses that commit to calculate the next version. Put `!` in the PR
 title for breaking changes so the marker survives squashing.
+
+Manual title workflow runs must select the open PR's current head branch in this repository and
+its matching PR number. The workflow verifies the head repository, branch, and commit before
+checking the live title. Ordinary PR events also validate fork PRs using their actual head commit.
 
 The normal pytest command also runs the repository script tests. See [the release guide](releases.md)
 for the allowed types, enforced ranges, GitHub settings, and release process.

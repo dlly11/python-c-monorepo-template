@@ -85,7 +85,10 @@ The separate `PR title` workflow runs the **Conventional PR title** check on PR 
 new commits, and edits. It reads the current title, so fixing a title also fixes its check without
 rerunning the build matrix. The main CI workflow continues to run for code changes.
 
-For a manual title check, select the PR's current head branch and supply its number:
+For a manual title check, select the open PR's current head branch in this repository and supply
+its number. The check fails if the PR's head repository, branch, or commit does not match the run;
+a run queued before the branch advances must be dispatched again. Normal PR events support forks
+and compare the PR's actual head commit, excluding GitHub's synthetic merge:
 
 ```bash
 gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
@@ -93,19 +96,38 @@ gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
 
 ## Automated release sequence
 
-The release workflow runs after every push to `main`:
+The release workflow runs after successful **push CI on the current `main` commit**:
 
-1. Release Please reads Conventional Commits and opens or updates one release pull request.
+1. The release gate verifies the triggering repository, CI workflow, event, branch, and commit,
+   then checks the latest push CI run for that commit. Only a completed successful run authorizes
+   Release Please to read Conventional Commits and open or update one release pull request.
 2. The pull request updates `version.txt`, `CHANGELOG.md`, every Python project version, the CMake
    version, and the Release Please manifest.
 3. The workflow checks out the managed branch, regenerates `uv.lock`, commits it when changed, and
    explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting release commit. The
    title workflow receives the release PR number.
 4. A maintainer reviews and merges the release pull request after its required checks pass.
-5. Release Please creates the `vX.Y.Z` tag and GitHub Release on the next `main` run.
+5. After the release PR is merged and push CI succeeds, Release Please creates the `vX.Y.Z` tag and
+   GitHub Release.
 6. The same workflow builds every Python wheel and source distribution, creates native install
    archives for Linux, macOS, and Windows, verifies their generated version headers, and attaches
    them to the GitHub Release.
+
+Automatic release runs for superseded commits skip without calling Release Please. The gate
+rechecks `main` immediately before that call; automatic and manual runs share one concurrency
+group. A passing PR check or manually dispatched CI run does not substitute for push CI.
+
+To retry release preparation manually, select `main`:
+
+```bash
+gh workflow run release.yml --ref main
+```
+
+Manual releases stop immediately if the selected commit is no longer current or its latest push
+CI is missing, pending, cancelled, or failed. Wait for successful push CI, then retry; the release
+workflow does not poll or start CI for you. If a push CI run needs retrying, rerun that original CI
+run so its event remains `push`. These retries are for release preparation, not missing assets;
+use the recovery procedure below once a release has already been created.
 
 The repository intentionally does not publish the example package names to PyPI. Add a separate,
 environment-protected publication job using trusted publishing after replacing the example names
@@ -142,6 +164,39 @@ access token is required. Manual dispatch requires the workflow to exist on the 
 The files `tools/release-please/config.json` and `tools/release-please/manifest.json` are Release
 Please policy and state. Change their structure only as part of an intentional release-policy
 migration.
+
+### Audit the managed GitHub settings
+
+`tools/github/repository-policy.json` records the intended default branch, merge defaults, PR
+requirements, required checks and GitHub Actions source IDs, administrator enforcement, and
+linear-history/force-push/deletion settings. It preserves the current solo-maintainer policy with
+zero required approvals and `COMMIT_MESSAGES` as the squash body default.
+
+With an authenticated GitHub CLI, run the read-only audit manually:
+
+```bash
+uv run python scripts/check_github_settings.py
+# Or target a repository explicitly, including a newly adopted template:
+uv run python scripts/check_github_settings.py --repo OWNER/REPO
+```
+
+Without `--repo`, the command uses `gh repo view` to detect the checkout's repository. Reading
+branch protection requires repository administration read access; a fine-grained token needs
+**Administration: read**. The audit requires no write permissions and makes only GET API requests.
+Exit status `0` means the managed settings match, `1` means settings differ, and `2` means the audit
+could not complete because of policy, authentication, or API errors. Every difference includes the
+expected and actual values. An inaccessible protection endpoint is an audit error, not evidence
+that protection is absent.
+
+The audit compares managed settings exactly, including the unordered set of required check names
+and their application IDs. Additional required checks are reported too; unrelated GitHub settings
+are ignored. Correct unintended differences in GitHub Settings, or edit the policy in a reviewed
+PR for an intentional change, then rerun the audit. Adopters should also update the workflows when
+changing branch or check names. The audit is not a CI job and never applies settings.
+
+This policy covers classic branch protection and repository merge settings on GitHub.com. It does
+not audit release tag restrictions, Pages, Actions workflow permissions, or organization rulesets.
+Those remain separate setup responsibilities described above.
 
 ## Recovering missing release assets
 
