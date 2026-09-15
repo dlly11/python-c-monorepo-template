@@ -19,6 +19,7 @@ def scripts(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
         name: import_module(name)
         for name in (
             "check_python",
+            "check_coverage",
             "repository_metadata",
             "github_checks",
             "check_versions",
