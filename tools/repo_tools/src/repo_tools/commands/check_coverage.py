@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
+from repo_tools.environment import check_environment
 
 
 def run_check(label: str, command: list[str], *, root: Path) -> int:
@@ -77,20 +77,18 @@ def write_summary(failures: list[str], report_root: Path) -> None:
     (report_root / "summary.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    return parser
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Run both coverage suites and retain every report that can be generated."""
-    root = resolve_root(root)
+    check_environment(root, group="coverage", command="check-coverage")
     build_root = root / "build/coverage"
     report_root = build_root / "reports"
     python_report_root = report_root / "python"
     native_report_root = report_root / "native"
-    required_tools = ("pytest", "cmake", "ctest", "ninja", "gcc", "g++", "gcov", "gcovr")
+    required_tools = ("cmake", "ctest", "ninja", "gcc", "g++", "gcov")
     missing_tools = [tool for tool in required_tools if shutil.which(tool) is None]
     if missing_tools:
         print(f"coverage checks failed: missing tools: {', '.join(missing_tools)}", file=sys.stderr)
@@ -108,6 +106,9 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
     python_status = run_check(
         "Python tests and coverage",
         [
+            sys.executable,
+            "-I",
+            "-m",
             "pytest",
             f"--cov-report=json:{python_report_root / 'coverage.json'}",
             f"--cov-report=xml:{python_report_root / 'coverage.xml'}",
@@ -139,6 +140,9 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
             gcovr_status = run_check(
                 "Generate and enforce native coverage",
                 [
+                    sys.executable,
+                    "-I",
+                    "-m",
                     "gcovr",
                     "--config",
                     "tools/coverage/gcovr.cfg",
@@ -165,8 +169,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
 
     print(f"coverage reports written to {report_root}")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

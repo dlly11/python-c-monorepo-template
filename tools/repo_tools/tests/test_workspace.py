@@ -7,6 +7,9 @@ from types import ModuleType
 
 import pytest
 
+from repo_tools import cli
+from repo_tools.commands import check_workspace
+
 
 def write_root(root: Path, *, exclude: tuple[str, ...] = (), overlap: bool = False) -> None:
     members = ["python/packages/*", "python/apps/*"]
@@ -32,11 +35,10 @@ def write_member(root: Path, path: str, name: str, namespace: str) -> None:
 
 
 @pytest.fixture
-def workspace(
-    tmp_path: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> tuple[ModuleType, Path]:
-    module = modules["check_workspace"]
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, Path]:
+    module = check_workspace
     write_root(tmp_path)
+    (tmp_path / "version.txt").write_text("1.2.3\n", encoding="utf-8")
     write_member(tmp_path, "python/packages/core", "sample-core", "sample_core")
     write_member(tmp_path, "python/apps/app", "sample-app", "sample_app")
     projects = {
@@ -52,7 +54,6 @@ def workspace(
     ]
     entries.append({"type": "generic", "path": "CMakeLists.txt"})
     release.write_text(json.dumps({"packages": {".": {"extra-files": entries}}}), encoding="utf-8")
-    monkeypatch.setattr(module, "resolve_root", lambda root=None: tmp_path)
     monkeypatch.setattr(
         module,
         "SMOKE_CHECKS",
@@ -65,7 +66,7 @@ def test_valid_workspace_is_read_only(workspace: tuple[ModuleType, Path]) -> Non
     module, root = workspace
     before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
     assert module.workspace_errors(root) == []
-    assert module.main() == 0
+    assert cli.main(["check-workspace"], default_root=root) == 0
     assert before == {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
 
@@ -154,7 +155,7 @@ def test_invalid_member_layout(workspace: tuple[ModuleType, Path], problem: str)
     else:
         (member / "src/sample_core/__init__.py").unlink()
     assert any("python/packages/core" in error for error in module.workspace_errors(root))
-    assert module.main() == 1
+    assert cli.main(["check-workspace"], default_root=root) == 1
 
 
 @pytest.mark.parametrize(
@@ -204,10 +205,10 @@ def test_duplicate_type_and_coverage_registrations(
 def test_malformed_root_returns_failure(
     workspace: tuple[ModuleType, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module, root = workspace
+    _module, root = workspace
     (root / "pyproject.toml").write_text("[broken", encoding="utf-8")
-    assert module.main() == 1
-    assert "invalid workspace configuration" in capsys.readouterr().err
+    assert cli.main(["check-workspace"], default_root=root) == 1
+    assert "no repository workspace" in capsys.readouterr().err
 
 
 def test_member_cannot_reuse_root_distribution_name(workspace: tuple[ModuleType, Path]) -> None:

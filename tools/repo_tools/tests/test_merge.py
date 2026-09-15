@@ -1,13 +1,14 @@
 """Reuse PR checks only when the merged Git tree and complete CI evidence agree."""
 
 import json
-import sys
 from copy import deepcopy
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
+
+from repo_tools import cli, github_checks
 
 REPOSITORY = "owner/project"
 
@@ -17,7 +18,7 @@ def test_merge_sha_changes_but_tested_tree_matches(
 ) -> None:
     _module, state = merge_context
     assert state["head"] != state["merge"]
-    assert state["cli"].main() == 0
+    assert cli.main(state["arguments"]) == 0
 
 
 @pytest.mark.parametrize("second_method", ["squash", "merge", "rebase"])
@@ -72,7 +73,7 @@ def test_push_can_mix_merge_methods(
         "validation_record",
         lambda repository, run_id: evidence if run_id == 200 else state["evidence"],
     )
-    assert state["cli"].main(["--base", state["base"], "--head", merged]) == 0
+    assert cli.main(["check-merge", "--base", state["base"], "--head", merged]) == 0
     output = capsys.readouterr().out
     assert "PR #1's tested tree" in output and "PR #2's tested tree" in output
 
@@ -95,11 +96,11 @@ def test_manual_release_branch_ci_and_fork_pr_ci(
 ) -> None:
     _module, state = merge_context
     state["runs"][0]["event"] = "workflow_dispatch"
-    assert state["cli"].main() == 0
+    assert cli.main(state["arguments"]) == 0
     state["pr"]["head"]["repo"]["full_name"] = "fork/project"
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
     state["runs"][0]["event"] = "pull_request"
-    assert state["cli"].main() == 0
+    assert cli.main(state["arguments"]) == 0
 
 
 @pytest.mark.parametrize("key", ["tree_sha", "head_sha", "run_id", "repository", "schema"])
@@ -108,7 +109,7 @@ def test_mismatched_validation_record_is_rejected(
 ) -> None:
     _module, state = merge_context
     state["evidence"][key] = "wrong"
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 @pytest.mark.parametrize("change", ["missing", "skipped", "failed", "duplicate"])
@@ -122,7 +123,7 @@ def test_every_required_ci_job_must_actually_pass(
         state["jobs"].append(deepcopy(state["jobs"][0]))
     else:
         state["jobs"][0]["conclusion"] = change
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 @pytest.mark.parametrize(
@@ -143,7 +144,7 @@ def test_wrong_or_unsuccessful_ci_run_is_rejected(
 ) -> None:
     _module, state = merge_context
     state["runs"][0][field] = value
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 def test_new_failed_run_cannot_reuse_old_success(
@@ -153,7 +154,7 @@ def test_new_failed_run_cannot_reuse_old_success(
     newer = deepcopy(state["runs"][0])
     newer.update(id=101, conclusion="failure")
     state["runs"].append(newer)
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 def test_missing_or_ambiguous_pr_is_rejected(
@@ -161,9 +162,9 @@ def test_missing_or_ambiguous_pr_is_rejected(
 ) -> None:
     _module, state = merge_context
     state["candidates"] = []
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
     state["candidates"] = [state["pr"], state["pr"]]
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 def test_missing_artifact_and_api_errors_fail_closed(
@@ -175,7 +176,7 @@ def test_missing_artifact_and_api_errors_fail_closed(
         raise RuntimeError("artifact expired or unavailable")
 
     monkeypatch.setattr(module, "validation_record", fail)
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 def test_rerun_started_during_download_is_rejected(
@@ -188,7 +189,7 @@ def test_rerun_started_during_download_is_rejected(
         return state["evidence"]
 
     monkeypatch.setattr(module, "validation_record", download)
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 def test_nonconventional_subject_and_unsupported_parent_counts_are_rejected(
@@ -275,9 +276,9 @@ def test_record_uses_actual_synthetic_merge_tree(
 
 
 def test_metadata_download_selects_exact_run_and_reads_json(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    module = modules["github_checks"]
+    module = github_checks
 
     def gh(*args: str) -> str:
         assert args[:6] == ("run", "download", "123", "--repo", REPOSITORY, "--name")
@@ -296,8 +297,8 @@ def test_initialization_has_actionable_diagnostic(
     base: str,
 ) -> None:
     _module, state = merge_context
-    monkeypatch.setattr(sys, "argv", ["check_merge.py", "--base", base, "--head", state["merge"]])
-    assert state["cli"].main() == 1
+    arguments = ["check-merge", "--base", base, "--head", state["merge"]]
+    assert cli.main(arguments) == 1
     assert "initial branch creation has no merged PR" in capsys.readouterr().err
 
 

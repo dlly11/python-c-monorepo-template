@@ -102,11 +102,9 @@ def probe(tool: Tool) -> tuple[bool, str]:
     return True, description
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument("--profile", choices=PROFILES, default="all")
-    return parser
 
 
 def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
@@ -133,8 +131,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
     print(f"{failures} prerequisite problem(s). See docs/workstation.md for setup and validation.")
     print("Python packages are managed by uv sync; compiler feature support is checked by CMake.")
     return int(failures != 0)
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

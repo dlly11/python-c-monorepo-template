@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
 from repo_tools.repository_metadata import python_projects
 
 
@@ -27,23 +26,15 @@ def check_projects(root: Path) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    return parser
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Run the workspace type checks."""
     try:
-        root = resolve_root(root)
         check_projects(root)
     except (OSError, KeyError, TypeError, ValueError, subprocess.CalledProcessError) as error:
         print(f"Python type check failed: {error}", file=sys.stderr)
         return 1
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

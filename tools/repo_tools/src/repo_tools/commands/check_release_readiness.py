@@ -50,7 +50,7 @@ def ready(
     ref: str,
     sha: str,
     *,
-    root: Path | None = None,
+    root: Path,
 ) -> bool:
     """Return false for obsolete automatic runs; reject all other ineligible runs."""
     automatic = event_name == "workflow_run"
@@ -138,13 +138,11 @@ def ready(
     return True
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    return parser
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Read GitHub's event context and emit a step output only after all checks pass."""
     try:
         repository = repository_name(os.environ["GITHUB_REPOSITORY"], root=root)
@@ -175,8 +173,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         )
         return 1
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

@@ -13,19 +13,17 @@ from repo_tools.github_checks import record, required_ci_jobs, verify_commit
 from repo_tools.repository_metadata import git
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--record", type=Path, help="write the PR validation record after quality checks"
     )
     mode.add_argument("--base", help="main commit before the push")
     parser.add_argument("--head", default="HEAD", help="main commit after the push")
-    return parser
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Record PR validation or account for every new main commit through tested PRs."""
     try:
         if args.record:
@@ -74,8 +72,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         )
         return 1
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

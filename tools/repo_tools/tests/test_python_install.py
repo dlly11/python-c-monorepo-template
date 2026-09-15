@@ -6,10 +6,12 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from types import ModuleType
 from zipfile import ZipFile
 
 import pytest
+
+from repo_tools import cli
+from repo_tools.commands import check_python_install
 
 
 def write_wheel(
@@ -38,8 +40,8 @@ def write_wheel(
 
 
 @pytest.mark.parametrize("problem", ["missing", "version", "duplicate", "unexpected"])
-def test_bad_artifacts_fail(tmp_path: Path, modules: dict[str, ModuleType], problem: str) -> None:
-    module = modules["check_python_install"]
+def test_bad_artifacts_fail(tmp_path: Path, problem: str) -> None:
+    module = check_python_install
     if problem == "version":
         write_wheel(tmp_path, "example-core", version="0.0.1")
     elif problem == "unexpected":
@@ -53,12 +55,12 @@ def test_bad_artifacts_fail(tmp_path: Path, modules: dict[str, ModuleType], prob
 
 @pytest.mark.parametrize("declared", [False, True])
 def test_install_uses_only_declared_dependencies(
-    tmp_path: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch, declared: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, declared: bool
 ) -> None:
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv is needed for the offline installation regression")
-    module = modules["check_python_install"]
+    module = check_python_install
     core = write_wheel(tmp_path, "example-core", code='message = "Hello"\n')
     package = write_wheel(
         tmp_path,
@@ -92,21 +94,23 @@ def test_install_uses_only_declared_dependencies(
     [("raise SystemExit(7)", {}), ('print("wrong")', {"stdout": "expected\n"})],
 )
 def test_failed_smoke_command_is_reported(
-    tmp_path: Path, modules: dict[str, ModuleType], code: str, options: dict[str, str]
+    tmp_path: Path, code: str, options: dict[str, str]
 ) -> None:
     with pytest.raises(RuntimeError, match=r"command.*python"):
-        modules["check_python_install"].run(
-            [sys.executable, "-I", "-c", code], cwd=tmp_path, env=dict(os.environ), **options
+        check_python_install.run(
+            [sys.executable, "-I", "-c", code],
+            cwd=tmp_path,
+            env=dict(os.environ),
+            stdout=options.get("stdout"),
         )
 
 
 def test_failure_returns_nonzero_and_removes_temporary_files(
     tmp_path: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    module = modules["check_python_install"]
+    module = check_python_install
     monkeypatch.setattr(module.tempfile, "tempdir", str(tmp_path))
     monkeypatch.setattr(module.shutil, "which", lambda _: "uv")
 
@@ -114,15 +118,15 @@ def test_failure_returns_nonzero_and_removes_temporary_files(
         raise RuntimeError("build failed deliberately")
 
     monkeypatch.setattr(module, "run", fail)
-    assert module.main([]) == 1
+    assert cli.main(["check-python-install"]) == 1
     assert "build failed deliberately" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
 
 
 def test_release_mode_checks_supplied_wheels_without_rebuilding(
-    tmp_path: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = modules["check_python_install"]
+    module = check_python_install
     wheel = write_wheel(tmp_path, "example-core")
     monkeypatch.setattr(
         module, "python_projects", lambda root: {Path("core/pyproject.toml"): "example-core"}
@@ -152,18 +156,18 @@ def test_release_mode_checks_supplied_wheels_without_rebuilding(
     monkeypatch.setattr(module, "run", no_build)
     monkeypatch.setattr(module, "check_tooling", no_build)
     monkeypatch.setattr(module, "check_wheel", check)
-    assert module.main(["--dist", str(tmp_path)]) == 0
+    assert cli.main(["check-python-install", "--dist", str(tmp_path)]) == 0
     assert checked == [wheel]
     assert wheel.exists()
 
 
 def test_install_discovers_selected_project_configuration(
-    tmp_path: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv is needed for the offline installation regression")
-    module = modules["check_python_install"]
+    module = check_python_install
     project = tmp_path / "project"
     artifacts = tmp_path / "private-wheels"
     temporary = tmp_path / "isolated"
@@ -195,10 +199,10 @@ def test_install_discovers_selected_project_configuration(
 
 
 def test_hanging_smoke_command_times_out_with_output(
-    tmp_path: Path, modules: dict[str, ModuleType]
+    tmp_path: Path,
 ) -> None:
     with pytest.raises(RuntimeError, match=r"timed out.*started"):
-        modules["check_python_install"].run(
+        check_python_install.run(
             [
                 sys.executable,
                 "-I",

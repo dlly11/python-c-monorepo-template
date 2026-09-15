@@ -1,10 +1,12 @@
 """Conventional Commit subjects used by release automation."""
 
-import sys
 from types import ModuleType
 from typing import Any
 
 import pytest
+
+from repo_tools import cli
+from repo_tools.commands import check_pr_title
 
 
 @pytest.mark.parametrize(
@@ -33,18 +35,14 @@ import pytest
         ("", 1),
     ],
 )
-def test_title_validation(
-    title: str, expected: int, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(sys, "argv", ["check_pr_title.py", title])
-    assert modules["check_pr_title"].main() == expected
+def test_title_validation(title: str, expected: int, monkeypatch: pytest.MonkeyPatch) -> None:
+    arguments = ["check-pr-title", title]
+    assert cli.main(arguments) == expected
 
 
 @pytest.fixture
-def pr_context(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> tuple[ModuleType, dict[str, Any]]:
-    module = modules["check_pr_title"]
+def pr_context(monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, dict[str, Any]]:
+    module = check_pr_title
     pr: dict[str, Any] = {
         "state": "open",
         "title": "fix: handle invalid input",
@@ -55,28 +53,26 @@ def pr_context(
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/project")
     monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("GITHUB_REF", "refs/heads/topic")
-    monkeypatch.setattr(
-        sys, "argv", ["check_pr_title.py", "--pr", "1", "--expected-head", "a" * 40]
-    )
+
     return module, pr
 
 
 def test_manual_title_requires_matching_branch_and_head(
     pr_context: tuple[ModuleType, dict[str, Any]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module, _ = pr_context
-    assert module.main() == 0
+    _module, _ = pr_context
+    assert cli.main(PR_ARGUMENTS) == 0
     monkeypatch.setenv("GITHUB_REF", "refs/heads/other")
-    assert module.main() == 1
+    assert cli.main(PR_ARGUMENTS) == 1
     monkeypatch.setenv("GITHUB_REF", "refs/tags/topic")
-    assert module.main() == 1
+    assert cli.main(PR_ARGUMENTS) == 1
 
 
 @pytest.mark.parametrize("change", ["sha", "closed", "invalid_title", "head_repo", "base_repo"])
 def test_mismatched_pr_cannot_pass_required_check(
     pr_context: tuple[ModuleType, dict[str, Any]], change: str
 ) -> None:
-    module, pr = pr_context
+    _module, pr = pr_context
     if change == "sha":
         pr["head"]["sha"] = "b" * 40
     elif change == "closed":
@@ -87,18 +83,18 @@ def test_mismatched_pr_cannot_pass_required_check(
         pr["head"]["repo"]["full_name"] = "fork/project"
     else:
         pr["base"]["repo"]["full_name"] = "other/project"
-    assert module.main() == 1
+    assert cli.main(PR_ARGUMENTS) == 1
 
 
 def test_ordinary_fork_pr_uses_real_head_not_synthetic_merge(
     pr_context: tuple[ModuleType, dict[str, Any]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module, pr = pr_context
+    _module, pr = pr_context
     pr["head"]["repo"]["full_name"] = "fork/project"
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     monkeypatch.setenv("GITHUB_REF", "refs/pull/1/merge")
     monkeypatch.setenv("GITHUB_SHA", "b" * 40)
-    assert module.main() == 0
+    assert cli.main(PR_ARGUMENTS) == 0
 
 
 def test_title_api_error_fails_check(
@@ -110,4 +106,7 @@ def test_title_api_error_fails_check(
         raise RuntimeError("API unavailable")
 
     monkeypatch.setattr(module, "api", fail)
-    assert module.main() == 1
+    assert cli.main(PR_ARGUMENTS) == 1
+
+
+PR_ARGUMENTS = ["check-pr-title", "--pr", "1", "--expected-head", "a" * 40]

@@ -7,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
 from repo_tools.python_smoke_checks import SMOKE_CHECKS
 from repo_tools.repository_metadata import (
     discover_members,
@@ -90,16 +89,14 @@ def workspace_errors(root: Path) -> list[str]:
     return errors
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    return parser
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Report all registration discrepancies and return a failing status if needed."""
     try:
-        errors = workspace_errors(resolve_root(root))
+        errors = workspace_errors(root)
     except (OSError, KeyError, TypeError, ValueError) as error:
         errors = [f"invalid workspace configuration: {error}"]
     for error in errors:
@@ -108,8 +105,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         return 1
     print("all Python workspace components have consistent registrations")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

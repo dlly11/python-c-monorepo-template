@@ -8,15 +8,16 @@ from typing import Any
 
 import pytest
 
+from repo_tools import cli, github_checks
+from repo_tools.commands import check_release_readiness
+
 REPOSITORY = "owner/project"
 SHA = "a" * 40
 
 
 @pytest.fixture
-def release_context(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> tuple[ModuleType, dict[str, Any]]:
-    module = modules["check_release_readiness"]
+def release_context(monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, dict[str, Any]]:
+    module = check_release_readiness
     run = {
         "id": 100,
         "workflow_id": 42,
@@ -62,7 +63,9 @@ def test_successful_current_push_authorizes_release(
     release_context: tuple[ModuleType, dict[str, Any]], event_name: str
 ) -> None:
     module, state = release_context
-    assert module.ready(event_name, state["event"], REPOSITORY, "refs/heads/main", SHA)
+    assert module.ready(
+        event_name, state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+    )
     assert state["reads"].count(f"repos/{REPOSITORY}/branches/main") == 2
 
 
@@ -89,7 +92,7 @@ def test_latest_run_must_match_all_release_requirements(
     module, state = release_context
     state["runs"][0][field] = value
     with pytest.raises(ValueError, match=field):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
 
 
 @pytest.mark.parametrize("field", ["event", "head_repository", "workflow_id"])
@@ -99,7 +102,9 @@ def test_automatic_event_is_checked_independently_of_latest_run(
     module, state = release_context
     state["event"]["workflow_run"][field] = None
     with pytest.raises(ValueError, match=field):
-        module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+        module.ready(
+            "workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+        )
 
 
 def test_stale_automatic_run_skips_but_manual_run_fails(
@@ -107,9 +112,11 @@ def test_stale_automatic_run_skips_but_manual_run_fails(
 ) -> None:
     module, state = release_context
     state["head"] = "b" * 40
-    assert not module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+    assert not module.ready(
+        "workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+    )
     with pytest.raises(ValueError, match="main is now"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
 
 
 def test_old_success_cannot_override_new_failure_or_rerun(
@@ -120,10 +127,12 @@ def test_old_success_cannot_override_new_failure_or_rerun(
     newer.update(id=101, status="in_progress", conclusion=None)
     state["runs"].insert(0, newer)
     with pytest.raises(ValueError, match="status"):
-        module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+        module.ready(
+            "workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+        )
     newer.update(status="completed", conclusion="failure")
     with pytest.raises(ValueError, match="conclusion"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
 
 
 def test_main_advance_during_reads_prevents_release(
@@ -139,7 +148,9 @@ def test_main_advance_during_reads_prevents_release(
         return result
 
     monkeypatch.setattr(module, "api", advance)
-    assert not module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+    assert not module.ready(
+        "workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+    )
 
 
 def test_missing_ci_and_manual_non_main_are_rejected(
@@ -148,9 +159,9 @@ def test_missing_ci_and_manual_non_main_are_rejected(
     module, state = release_context
     state["runs"] = []
     with pytest.raises(ValueError, match="no push CI"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
     with pytest.raises(ValueError, match="main branch"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/topic", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/topic", SHA, root=Path.cwd())
 
 
 @pytest.mark.parametrize("conclusion", ["missing", "skipped", "failure"])
@@ -163,7 +174,7 @@ def test_release_requires_actual_merge_verification(
     else:
         state["jobs"][0]["conclusion"] = conclusion
     with pytest.raises(ValueError, match="Merged PR verification"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
 
 
 @pytest.mark.parametrize("allowed", [True, False])
@@ -187,7 +198,7 @@ def test_step_output_records_decision(
     }.items():
         monkeypatch.setenv(name, value)
     monkeypatch.setattr(module, "ready", lambda *args, **kwargs: allowed)
-    assert module.main() == 0
+    assert cli.main(["check-release-readiness"]) == 0
     assert output_path.read_text() == f"ready={str(allowed).lower()}\n"
 
     def fail(*args: object) -> None:
@@ -195,7 +206,7 @@ def test_step_output_records_decision(
 
     output_path.unlink()
     monkeypatch.setattr(module, "ready", fail)
-    assert module.main() == 1
+    assert cli.main(["check-release-readiness"]) == 1
     assert not output_path.exists()
 
 
@@ -204,14 +215,21 @@ def test_initialization_never_authorizes_release(
 ) -> None:
     module, state = release_context
     state["jobs"][0]["conclusion"] = "skipped"
-    assert not module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+    assert not module.ready(
+        "workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA, root=Path.cwd()
+    )
     with pytest.raises(ValueError, match="Merged PR verification"):
-        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA, root=Path.cwd())
 
 
 def recover(module: ModuleType, state: dict[str, Any]) -> bool:
     return module.ready(
-        "workflow_dispatch", state["event"], REPOSITORY, "refs/heads/main", state["merge"]
+        "workflow_dispatch",
+        state["event"],
+        REPOSITORY,
+        "refs/heads/main",
+        state["merge"],
+        root=Path.cwd(),
     )
 
 
@@ -291,7 +309,6 @@ def test_recovery_requires_matching_record(
 
 def test_recovery_rejects_expired_evidence(
     recovery_context: tuple[ModuleType, dict[str, Any]],
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module, state = recovery_context
@@ -299,7 +316,7 @@ def test_recovery_rejects_expired_evidence(
     def expired(*args: object) -> None:
         raise RuntimeError("artifact expired")
 
-    monkeypatch.setattr(modules["github_checks"], "validation_record", expired)
+    monkeypatch.setattr(github_checks, "validation_record", expired)
     with pytest.raises(RuntimeError, match="expired"):
         recover(module, state)
 
@@ -307,7 +324,6 @@ def test_recovery_rejects_expired_evidence(
 @pytest.mark.parametrize("race", ["newer", "rerun", "main"])
 def test_recovery_cannot_authorize_stale_evidence(
     recovery_context: tuple[ModuleType, dict[str, Any]],
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     race: str,
 ) -> None:
@@ -324,7 +340,7 @@ def test_recovery_cannot_authorize_stale_evidence(
             state["runs"].append(newer)
         return state["evidence"]
 
-    monkeypatch.setattr(modules["github_checks"], "validation_record", record)
+    monkeypatch.setattr(github_checks, "validation_record", record)
     with pytest.raises(ValueError):
         recover(module, state)
 
@@ -370,7 +386,19 @@ def test_recovery_requires_manual_release_on_main(
     module, state = recovery_context
     with pytest.raises(ValueError, match="main branch"):
         module.ready(
-            "workflow_dispatch", state["event"], REPOSITORY, "refs/heads/topic", state["merge"]
+            "workflow_dispatch",
+            state["event"],
+            REPOSITORY,
+            "refs/heads/topic",
+            state["merge"],
+            root=Path.cwd(),
         )
     with pytest.raises(ValueError, match="manual Release"):
-        module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", state["merge"])
+        module.ready(
+            "workflow_run",
+            state["event"],
+            REPOSITORY,
+            "refs/heads/main",
+            state["merge"],
+            root=Path.cwd(),
+        )

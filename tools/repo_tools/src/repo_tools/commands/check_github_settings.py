@@ -11,14 +11,12 @@ from repo_tools.github_api import api, repository_name
 from repo_tools.github_checks import differences, load_policy
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument("--repo", help="OWNER/REPO (default: current checkout's GitHub repository)")
-    return parser
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Return 0 for matching settings, 1 for drift, and 2 for an unavailable audit."""
     try:
         policy = load_policy(root=root)
@@ -43,8 +41,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         return 1
     print(f"Managed GitHub settings match policy for {repository}. No settings were changed.")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

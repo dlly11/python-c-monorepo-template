@@ -12,7 +12,6 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-from repo_tools.context import resolve_root
 from repo_tools.python_smoke_checks import INSTALL_CHECK, SMOKE_CHECKS
 from repo_tools.repository_metadata import normalized_name, project_metadata, python_projects
 
@@ -173,18 +172,16 @@ def check_tooling(uv: str, project_root: Path, temporary: Path) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument(
         "--dist", type=Path, help="verify existing release wheels without rebuilding"
     )
-    return parser
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Build once and check every wheel without using the workspace environment."""
-    project_root = resolve_root(root)
+    project_root = root
     context = "build"
     try:
         uv = shutil.which("uv")
@@ -227,8 +224,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         return 1
     print("All Python wheels passed isolated installation checks")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from repo_tools.context import resolve_root
 from repo_tools.conventional_commits import check_message
 from repo_tools.github_api import api, gh, items, repository_name
 from repo_tools.repository_metadata import git
@@ -41,9 +40,9 @@ def differences(expected: dict[str, Any], actual: dict[str, Any], prefix: str) -
     return errors
 
 
-def load_policy(*, root: Path | None = None) -> dict[str, Any]:
+def load_policy(*, root: Path) -> dict[str, Any]:
     """Reject incomplete policy files before attempting any GitHub reads."""
-    policy = json.loads((resolve_root(root) / POLICY).read_text(encoding="utf-8"))
+    policy = json.loads((root / POLICY).read_text(encoding="utf-8"))
     if not isinstance(policy, dict) or set(policy) != {"repository", "protection"}:
         raise ValueError("policy must contain repository and protection objects")
     if not all(isinstance(value, dict) and value for value in policy.values()):
@@ -220,7 +219,7 @@ def merged_pr(
     return pr, list(reversed(integration))
 
 
-def required_ci_jobs(*, root: Path | None = None) -> set[str]:
+def required_ci_jobs(*, root: Path) -> set[str]:
     """Read the required CI job names; final subjects replace the separate title check."""
     required = {
         check["context"]

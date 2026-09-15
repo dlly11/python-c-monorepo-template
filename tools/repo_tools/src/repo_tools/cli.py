@@ -36,12 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         module = import_module(f"repo_tools.commands.{command.replace('-', '_')}")
         subparser = subparsers.add_parser(
             command,
-            parents=[module.build_parser()],
-            add_help=False,
             help=module.__doc__,
             description=module.__doc__,
         )
-        subparser.set_defaults(execute=module.execute)
+        module.add_arguments(subparser)
+        subparser.set_defaults(execute=module.execute, parser=subparser)
     return parser
 
 
