@@ -1,18 +1,26 @@
 """Isolated fixtures for repository orchestration scripts."""
 
+import os
+import subprocess
+import sys
 from importlib import import_module
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
 
 @pytest.fixture
 def scripts(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
+    monkeypatch.setattr("sys.argv", ["script.py"])
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1]))
     return {
         name: import_module(name)
         for name in (
+            "check_python",
+            "repository_metadata",
+            "github_checks",
             "check_versions",
             "set_version",
             "check_native_install",
@@ -41,10 +49,151 @@ def repository(
         "project(example VERSION 1.2.3 LANGUAGES C)\n", encoding="utf-8"
     )
     packages = []
-    for path, name in scripts["check_versions"].PROJECT_FILES.items():
+    projects = {
+        Path("pyproject.toml"): "sample-template",
+        Path("python/packages/core/pyproject.toml"): "sample-core",
+    }
+    for path, name in projects.items():
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(f'[project]\nname = "{name}"\nversion = "1.2.3"\n', encoding="utf-8")
         packages.append(f'[[package]]\nname = "{name}"\nversion = "1.2.3"\n')
+    with (tmp_path / "pyproject.toml").open("a") as file:
+        file.write('[tool.uv.workspace]\nmembers = ["python/packages/*"]\n')
+    package = tmp_path / "python/packages/core/src/sample_core"
+    package.mkdir(parents=True)
+    (package / "__init__.py").touch()
     (tmp_path / "uv.lock").write_text("\n".join(packages), encoding="utf-8")
     return tmp_path
+
+
+REPOSITORY = "owner/project"
+
+
+@pytest.fixture
+def merge_context(
+    scripts: dict[str, ModuleType], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[ModuleType, dict[str, Any]]:
+    module = scripts["github_checks"]
+    cli = scripts["check_merge"]
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GITHUB_REPOSITORY", REPOSITORY)
+
+    def git(*arguments: str) -> str:
+        return subprocess.check_output(
+            ["git", *arguments], stderr=subprocess.DEVNULL, text=True
+        ).strip()
+
+    git("init", "--initial-branch=main")
+    git("config", "user.name", "Merge tests")
+    git("config", "user.email", "merge@example.invalid")
+    source = tmp_path / "source.txt"
+    source.write_text("before\n", encoding="utf-8")
+    git("add", "source.txt")
+    git("commit", "-m", "chore: initialize")
+    base = git("rev-parse", "HEAD")
+    source.write_text("after\n", encoding="utf-8")
+    git("commit", "-am", "fix: change contents")
+    head = git("rev-parse", "HEAD")
+    tree = git("rev-parse", "HEAD^{tree}")
+    merge = git("commit-tree", tree, "-p", base, "-m", "fix: change contents (#1)")
+    git("update-ref", "refs/heads/main", merge)
+    required = {
+        check["context"]
+        for check in module.load_policy()["protection"]["required_status_checks"]["checks"]
+    } - {"Conventional PR title"}
+    pr = {
+        "number": 1,
+        "merged_at": "2026-09-15T00:00:00Z",
+        "merge_commit_sha": merge,
+        "head": {"sha": head, "ref": "topic", "repo": {"full_name": REPOSITORY}},
+        "base": {"ref": "main", "repo": {"full_name": REPOSITORY}},
+    }
+    run = {
+        "id": 100,
+        "workflow_id": 42,
+        "path": ".github/workflows/ci.yml",
+        "status": "completed",
+        "conclusion": "success",
+        "event": "pull_request",
+        "head_sha": head,
+        "head_branch": "topic",
+        "repository": {"full_name": REPOSITORY},
+        "pull_requests": [],
+    }
+    state: dict[str, Any] = {
+        "cli": cli,
+        "base": base,
+        "head": head,
+        "merge": merge,
+        "tree": tree,
+        "pr": pr,
+        "runs": [run],
+        "candidates": [pr],
+        "required": required,
+        "git": git,
+        "jobs": [
+            {"name": name, "status": "completed", "conclusion": "success"} for name in required
+        ],
+        "evidence": {
+            "schema": 1,
+            "repository": REPOSITORY,
+            "run_id": 100,
+            "head_sha": head,
+            "checkout_sha": head,
+            "tree_sha": tree,
+        },
+    }
+
+    def api(endpoint: str) -> dict[str, Any]:
+        if endpoint.endswith("/pulls/1"):
+            return state["pr"]
+        if endpoint.endswith("/workflows/ci.yml"):
+            return {"id": 42}
+        return next(run for run in state["runs"] if endpoint.endswith(f"/runs/{run['id']}"))
+
+    def items(endpoint: str, key: str | None = None) -> list[dict[str, Any]]:
+        if "/commits/" in endpoint:
+            return state["candidates"]
+        return state["jobs"] if key == "jobs" else state["runs"]
+
+    monkeypatch.setattr(module, "api", api)
+    monkeypatch.setattr(cli, "api", api)
+    monkeypatch.setattr(module, "items", items)
+    monkeypatch.setattr(module, "validation_record", lambda *args: state["evidence"])
+    monkeypatch.setattr(sys, "argv", ["check_merge.py", "--base", base, "--head", merge])
+    return module, state
+
+
+@pytest.fixture
+def recovery_context(
+    merge_context: tuple[ModuleType, dict[str, Any]],
+    scripts: dict[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[ModuleType, dict[str, Any]]:
+    merge, state = merge_context
+    release = scripts["check_release_readiness"]
+    state["runs"][0].update(
+        event="workflow_dispatch",
+        head_branch="main",
+        head_sha=state["merge"],
+        head_repository={"full_name": REPOSITORY},
+    )
+    state["evidence"].update(head_sha=state["merge"], checkout_sha=state["merge"])
+    state["current"] = state["merge"]
+    state["event"] = {"inputs": {"recovery-run-id": "100"}}
+    original = merge.api
+
+    def api(endpoint: str) -> dict[str, Any]:
+        if endpoint.endswith("/branches/main"):
+            return {"commit": {"sha": state["current"]}}
+        if "/runs?" in endpoint:
+            assert "event=workflow_dispatch" in endpoint
+            assert f"head_sha={state['merge']}" in endpoint
+            return {"workflow_runs": state["runs"]}
+        return original(endpoint)
+
+    monkeypatch.setattr(release, "api", api)
+    return release, state

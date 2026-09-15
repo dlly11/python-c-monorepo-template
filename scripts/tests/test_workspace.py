@@ -53,10 +53,6 @@ def workspace(
     entries.append({"type": "generic", "path": "CMakeLists.txt"})
     release.write_text(json.dumps({"packages": {".": {"extra-files": entries}}}), encoding="utf-8")
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "PROJECT_FILES", projects)
-    monkeypatch.setattr(
-        module, "PROJECTS", (tmp_path / "python/packages/core", tmp_path / "python/apps/app")
-    )
     monkeypatch.setattr(
         module,
         "SMOKE_CHECKS",
@@ -68,7 +64,7 @@ def workspace(
 def test_valid_workspace_is_read_only(workspace: tuple[ModuleType, Path]) -> None:
     module, root = workspace
     before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
-    assert module.workspace_errors() == []
+    assert module.workspace_errors(root) == []
     assert module.main() == 0
     assert before == {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
@@ -76,10 +72,8 @@ def test_valid_workspace_is_read_only(workspace: tuple[ModuleType, Path]) -> Non
 def test_new_member_reports_all_missing_registrations(workspace: tuple[ModuleType, Path]) -> None:
     module, root = workspace
     write_member(root, "python/packages/new", "sample-new", "sample_new")
-    errors = "\n".join(module.workspace_errors())
+    errors = "\n".join(module.workspace_errors(root))
     for registry in (
-        "PROJECT_FILES",
-        "PROJECTS",
         "SMOKE_CHECKS",
         "source",
         "known-first-party",
@@ -100,7 +94,7 @@ def test_removed_or_renamed_member_reports_stale_entries(
         shutil.rmtree(path)
     else:
         path.rename(root / "python/packages/renamed")
-    errors = "\n".join(module.workspace_errors())
+    errors = "\n".join(module.workspace_errors(root))
     assert "stale python/packages/core/pyproject.toml" in errors
     if operation == "rename":
         assert "missing python/packages/renamed/pyproject.toml" in errors
@@ -111,8 +105,7 @@ def test_distribution_rename_is_detected(workspace: tuple[ModuleType, Path]) -> 
     (root / "python/packages/core/pyproject.toml").write_text(
         '[project]\nname = "renamed-core"\n', encoding="utf-8"
     )
-    errors = "\n".join(module.workspace_errors())
-    assert "should name renamed-core, found sample-core" in errors
+    errors = "\n".join(module.workspace_errors(root))
     assert "SMOKE_CHECKS: missing renamed-core" in errors
     assert "SMOKE_CHECKS: stale sample-core" in errors
 
@@ -121,7 +114,7 @@ def test_excluded_directory_and_overlapping_globs(workspace: tuple[ModuleType, P
     module, root = workspace
     write_member(root, "python/packages/excluded", "ignored", "ignored")
     write_root(root, exclude=("python/packages/excluded",), overlap=True)
-    assert module.workspace_errors() == []
+    assert module.workspace_errors(root) == []
 
 
 @pytest.mark.parametrize(
@@ -136,7 +129,7 @@ def test_duplicate_component_names(
 ) -> None:
     module, root = workspace
     write_member(root, "python/packages/duplicate", name, namespace)
-    assert message in module.workspace_errors()
+    assert message in module.workspace_errors(root)
 
 
 def test_namespace_rename_is_detected(workspace: tuple[ModuleType, Path]) -> None:
@@ -144,7 +137,7 @@ def test_namespace_rename_is_detected(workspace: tuple[ModuleType, Path]) -> Non
     (root / "python/packages/core/src/sample_core").rename(
         root / "python/packages/core/src/new_core"
     )
-    errors = "\n".join(module.workspace_errors())
+    errors = "\n".join(module.workspace_errors(root))
     assert "namespace 'sample_core' is missing" in errors
     assert "source: missing new_core" in errors
     assert "known-first-party: stale sample_core" in errors
@@ -160,7 +153,7 @@ def test_invalid_member_layout(workspace: tuple[ModuleType, Path], problem: str)
         (member / "pyproject.toml").write_text("[broken", encoding="utf-8")
     else:
         (member / "src/sample_core/__init__.py").unlink()
-    assert any("python/packages/core" in error for error in module.workspace_errors())
+    assert any("python/packages/core" in error for error in module.workspace_errors(root))
     assert module.main() == 1
 
 
@@ -187,7 +180,7 @@ def test_release_registration_errors(workspace: tuple[ModuleType, Path], problem
     else:
         entries[0]["jsonpath"] = "$.version"
     path.write_text(json.dumps(config), encoding="utf-8")
-    errors = module.workspace_errors()
+    errors = module.workspace_errors(root)
     assert errors
     assert all(str(module.RELEASE_CONFIG) in error for error in errors)
 
@@ -196,7 +189,6 @@ def test_duplicate_type_and_coverage_registrations(
     workspace: tuple[ModuleType, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module, root = workspace
-    monkeypatch.setattr(module, "PROJECTS", (*module.PROJECTS, module.PROJECTS[0]))
     path = root / "pyproject.toml"
     path.write_text(
         path.read_text(encoding="utf-8").replace(
@@ -205,8 +197,7 @@ def test_duplicate_type_and_coverage_registrations(
         ),
         encoding="utf-8",
     )
-    errors = "\n".join(module.workspace_errors())
-    assert "check_python.PROJECTS: duplicate" in errors
+    errors = "\n".join(module.workspace_errors(root))
     assert "source: duplicate sample_core" in errors
 
 
@@ -222,4 +213,6 @@ def test_malformed_root_returns_failure(
 def test_member_cannot_reuse_root_distribution_name(workspace: tuple[ModuleType, Path]) -> None:
     module, root = workspace
     write_member(root, "python/packages/duplicate", "sample-template", "different")
-    assert "workspace distribution names: duplicate sample-template" in module.workspace_errors()
+    assert "workspace distribution names: duplicate sample-template" in module.workspace_errors(
+        root
+    )

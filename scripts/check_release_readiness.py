@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -11,8 +12,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from check_merge import check_evidence, check_jobs, merged_pr, required_ci_jobs
 from github_api import api, items, repository_name
+from github_checks import check_evidence, check_jobs, merged_pr, required_ci_jobs
 
 
 def check_run(
@@ -129,8 +130,9 @@ def ready(event_name: str, event: dict[str, Any], repository: str, ref: str, sha
     return True
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Read GitHub's event context and emit a step output only after all checks pass."""
+    argparse.ArgumentParser(description=__doc__).parse_args(argv)
     try:
         repository = repository_name(os.environ["GITHUB_REPOSITORY"])
         event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))

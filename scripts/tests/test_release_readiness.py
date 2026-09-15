@@ -207,3 +207,154 @@ def test_initialization_never_authorizes_release(
     assert not module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
     with pytest.raises(ValueError, match="Merged PR verification"):
         module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
+
+
+def recover(module: ModuleType, state: dict[str, Any]) -> bool:
+    return module.ready(
+        "workflow_dispatch", state["event"], REPOSITORY, "refs/heads/main", state["merge"]
+    )
+
+
+def test_fresh_main_ci_recovers_without_original_pr_artifact(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = recovery_context
+    assert recover(module, state)
+
+
+@pytest.mark.parametrize("defect", ["missing", "skipped", "failure", "duplicate"])
+def test_recovery_requires_all_quality_jobs(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    defect: str,
+) -> None:
+    module, state = recovery_context
+    if defect == "missing":
+        state["jobs"].pop()
+    elif defect == "duplicate":
+        state["jobs"].append(deepcopy(state["jobs"][0]))
+    else:
+        state["jobs"][0]["conclusion"] = defect
+    with pytest.raises(ValueError, match="required CI job"):
+        recover(module, state)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("workflow_id", 99),
+        ("event", "pull_request"),
+        ("head_branch", "topic"),
+        ("head_sha", "wrong"),
+        ("status", "in_progress"),
+        ("conclusion", "failure"),
+        ("repository", {"full_name": "other/repo"}),
+        ("head_repository", {"full_name": "fork/repo"}),
+    ],
+)
+def test_recovery_rejects_wrong_or_unfinished_run(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    field: str,
+    value: object,
+) -> None:
+    module, state = recovery_context
+    state["runs"][0][field] = value
+    with pytest.raises(ValueError, match=field):
+        recover(module, state)
+
+
+@pytest.mark.parametrize("field", ["repository", "run_id", "head_sha", "checkout_sha", "tree_sha"])
+def test_recovery_requires_matching_record(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    field: str,
+) -> None:
+    module, state = recovery_context
+    state["evidence"][field] = "wrong"
+    with pytest.raises(ValueError, match=field):
+        recover(module, state)
+
+
+def test_recovery_rejects_expired_evidence(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    scripts: dict[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, state = recovery_context
+
+    def expired(*args: object) -> None:
+        raise RuntimeError("artifact expired")
+
+    monkeypatch.setattr(scripts["github_checks"], "validation_record", expired)
+    with pytest.raises(RuntimeError, match="expired"):
+        recover(module, state)
+
+
+@pytest.mark.parametrize("race", ["newer", "rerun", "main"])
+def test_recovery_cannot_authorize_stale_evidence(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    scripts: dict[str, ModuleType],
+    monkeypatch: pytest.MonkeyPatch,
+    race: str,
+) -> None:
+    module, state = recovery_context
+
+    def record(*args: object) -> dict[str, Any]:
+        if race == "main":
+            state["current"] = "b" * 40
+        elif race == "rerun":
+            state["runs"][0].update(status="in_progress", conclusion=None)
+        else:
+            newer = deepcopy(state["runs"][0])
+            newer.update(id=101, conclusion="failure")
+            state["runs"].append(newer)
+        return state["evidence"]
+
+    monkeypatch.setattr(scripts["github_checks"], "validation_record", record)
+    with pytest.raises(ValueError):
+        recover(module, state)
+
+
+def test_recovery_rejects_older_run_and_non_pr_commits(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = recovery_context
+    state["event"]["inputs"]["recovery-run-id"] = "99"
+    with pytest.raises(ValueError, match="latest manual"):
+        recover(module, state)
+    state["event"]["inputs"]["recovery-run-id"] = "100"
+    state["candidates"] = []
+    with pytest.raises(ValueError, match="merged PR"):
+        recover(module, state)
+
+
+@pytest.mark.parametrize("value", ["-1", "0", "one", "1.0", True, False, 0, None])
+def test_recovery_input_validation(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+    value: object,
+) -> None:
+    module, state = recovery_context
+    state["event"]["inputs"]["recovery-run-id"] = value
+    with pytest.raises(ValueError, match="positive run ID"):
+        recover(module, state)
+
+
+def test_bootstrap_root_cannot_use_recovery(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = recovery_context
+    state["merge"] = state["base"]
+    state["current"] = state["base"]
+    state["runs"][0]["head_sha"] = state["base"]
+    with pytest.raises(ValueError, match="squash commit with one parent"):
+        recover(module, state)
+
+
+def test_recovery_requires_manual_release_on_main(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = recovery_context
+    with pytest.raises(ValueError, match="main branch"):
+        module.ready(
+            "workflow_dispatch", state["event"], REPOSITORY, "refs/heads/topic", state["merge"]
+        )
+    with pytest.raises(ValueError, match="manual Release"):
+        module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", state["merge"])

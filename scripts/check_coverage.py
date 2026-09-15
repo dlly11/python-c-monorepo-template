@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -55,22 +56,23 @@ def write_summary(failures: list[str]) -> None:
     rows = [
         "# Coverage summary",
         "",
-        "| Stack | Lines | Branches | Enforced gate |",
+        "| Stack | Lines | Branches | Aggregate |",
         "| --- | ---: | ---: | --- |",
     ]
 
     if python is None:
-        rows.append("| Python | unavailable | unavailable | 90% aggregate |")
+        rows.append("| Python | unavailable | unavailable | unavailable |")
     else:
         line, branch, aggregate = python
-        rows.append(f"| Python | {line:.1f}% | {branch:.1f}% | 90% aggregate ({aggregate:.1f}%) |")
+        rows.append(f"| Python | {line:.1f}% | {branch:.1f}% | {aggregate:.1f}% |")
 
     if native is None:
-        rows.append("| Native C | unavailable | unavailable | 90% lines / 80% branches |")
+        rows.append("| Native C | unavailable | unavailable | — |")
     else:
         line, branch = native
-        rows.append(f"| Native C | {line:.1f}% | {branch:.1f}% | 90% lines / 80% branches |")
+        rows.append(f"| Native C | {line:.1f}% | {branch:.1f}% | — |")
 
+    rows.extend(["", "Thresholds: `pyproject.toml` and `tools/coverage/gcovr.cfg`."])
     if failures:
         rows.extend(["", f"Failed stages: {', '.join(failures)}."])
     else:
@@ -79,8 +81,9 @@ def write_summary(failures: list[str]) -> None:
     (REPORT_ROOT / "summary.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Run both coverage suites and retain every report that can be generated."""
+    argparse.ArgumentParser(description=__doc__).parse_args(argv)
     if BUILD_ROOT.exists():
         shutil.rmtree(BUILD_ROOT)
     PYTHON_REPORT_ROOT.mkdir(parents=True)

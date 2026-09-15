@@ -7,17 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from conventional_commits import valid_subject
-
-
-def git(*arguments: str) -> str:
-    """Read Git metadata without shell interpretation or signature output."""
-    return subprocess.run(
-        ["git", "-c", "log.showSignature=false", *arguments],
-        check=True,
-        capture_output=True,
-        encoding="utf-8",
-    ).stdout
+from conventional_commits import check_message
+from repository_metadata import git
 
 
 def commits_between(base: str, head: str) -> list[str]:
@@ -31,24 +22,14 @@ def commits_between(base: str, head: str) -> list[str]:
     return git("rev-list", "--reverse", revision_range, "--").splitlines()
 
 
-def check_message(message: str, label: str) -> bool:
-    """Check only the subject; bodies and release footers remain free-form."""
-    subject = message.split("\n", 1)[0]
-    if valid_subject(subject):
-        return True
-    print(f"invalid Conventional Commit subject ({label}): {subject!r}", file=sys.stderr)
-    print("example: feat(package-a): add JSON output", file=sys.stderr)
-    return False
-
-
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Support the commit-msg hook and CI without additional dependencies."""
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--message-file", type=Path, help="message file supplied by commit-msg")
     source.add_argument("--base", help="exclude commits reachable from this ref or SHA")
     parser.add_argument("--head", default="HEAD", help="last commit to check (default: HEAD)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         if args.message_file is not None:
             return int(
