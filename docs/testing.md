@@ -71,17 +71,9 @@ PR runs and full manually dispatched release-branch runs both produce this recor
 metadata, not a distributable build artifact. Release distributions are built from their tag.
 
 The verifier reads records from the selected CI run only, fails on missing or expired evidence,
-and never executes downloaded content. GitHub's repository artifact retention applies. Original
-runs can be retried only within [30 days of their initial run](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
-Within that window, rerun the original PR CI including Python quality, then retry push CI. A partial
-rerun can reuse the quality job's record from the same run and immutable head.
-
-After that window, or when the original run is unavailable, use the explicit
-[release evidence recovery procedure](releases.md): run fresh manual
-CI on current main, then supply its run ID to a manual Release dispatch. This exercises the full
-suite on the exact merged commit. Missing evidence never counts as success, and the failed
-historical push run is not rewritten as passing. Before merging a long-lived PR, push a new
-Conventional Commit to obtain fresh PR validation if the original run can no longer be retried.
+and never executes downloaded content. GitHub's repository artifact retention applies. See
+[CI evidence recovery](releases.md#recovering-expired-ci-evidence) for retry limits, rerunning
+original validation, and authorizing recovery from fresh CI on current main.
 
 CI regressions cover all three merge methods with matching trees, rewritten SHAs, incomplete rebase
 ranges, content mismatches, wrong parents or subjects, mixed merge methods in one push, wrong runs,
@@ -200,9 +192,15 @@ uv sync --locked --all-packages --group coverage
 uv run --group coverage repo-tools check-coverage
 ```
 
-The command first checks that required tools are available. Missing prerequisites return a failure
-without changing existing reports or creating a new report directory; the error explicitly states
-that no fresh results were generated. Previous reports still describe their original run.
+Before changing outputs, documentation and coverage check that the selected checkout's first-party
+packages and required Python tools are available through the running interpreter. They run Python
+tools as isolated modules, so another `pytest`, `gcovr`, or `sphinx` executable on PATH cannot select
+a different environment. Coverage also checks its native executables.
+
+Missing dependencies or mismatched sources fail before replacing reports or creating output
+directories. Follow the reported sync and rerun commands; previous reports still describe their
+original run. `--project-root` selects checkout files, not a Python environment; see the
+[package guide](../tools/repo_tools/README.md#checkout-and-python-environment).
 
 After preflight succeeds, the command removes the previous `build/coverage` directory, runs both
 test suites, enforces their thresholds, and writes reports beneath `build/coverage/reports`:
