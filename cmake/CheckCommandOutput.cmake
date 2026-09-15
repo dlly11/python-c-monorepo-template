@@ -24,6 +24,7 @@ if(DEFINED COMMAND_ARGUMENT)
     RESULT_VARIABLE command_status
     ${output_option}
     ERROR_VARIABLE command_error
+    TIMEOUT 10
   )
 else()
   execute_process(
@@ -31,7 +32,12 @@ else()
     RESULT_VARIABLE command_status
     ${output_option}
     ERROR_VARIABLE command_error
+    TIMEOUT 10
   )
+endif()
+
+if(command_status MATCHES "[Tt]imeout")
+  message(FATAL_ERROR "Command '${COMMAND_PATH}' exceeded its 10-second timeout: ${command_error}")
 endif()
 
 # A string comparison also rejects process-launch errors and signal descriptions.

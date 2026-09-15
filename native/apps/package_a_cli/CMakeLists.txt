@@ -32,6 +32,7 @@ if(BUILD_TESTING)
       COMMAND "${CMAKE_COMMAND}" ${command_options}
         -P "${PROJECT_SOURCE_DIR}/cmake/CheckCommandOutput.cmake"
     )
+    set_tests_properties("${name}" PROPERTIES TIMEOUT 60)
   endfunction()
 
   monorepo_add_cli_test(c.package_a_cli 0 "Hello, Ada!\n" "" "Ada")

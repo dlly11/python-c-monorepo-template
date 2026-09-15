@@ -126,6 +126,10 @@ CLI process tests check exit status, standard output, and standard error indepen
 empty input. Linux additionally checks that greeting and version output fail when redirected to
 `/dev/full`. UBSan findings are fatal in sanitizer builds.
 
+Each first-party native CTest test, including the installed consumer, has a 60-second execution
+limit. The CLI output-comparison helper additionally stops its child process after ten seconds
+and reports the executable and limit. These limits apply to local builds and CI.
+
 ## Repository script tests
 
 Workflow regression tests mock GitHub API reads to verify release eligibility, stale/pending/failed
@@ -172,8 +176,12 @@ uv sync --locked --all-packages --group coverage
 uv run --group coverage python scripts/check_coverage.py
 ```
 
-The command removes only the previous `build/coverage` directory, runs both test suites, enforces
-their thresholds, and writes reports beneath `build/coverage/reports`:
+The command first checks that required tools are available. Missing prerequisites return a failure
+without changing existing reports or creating a new report directory; the error explicitly states
+that no fresh results were generated. Previous reports still describe their original run.
+
+After preflight succeeds, the command removes the previous `build/coverage` directory, runs both
+test suites, enforces their thresholds, and writes reports beneath `build/coverage/reports`:
 
 - `summary.md` contains the combined line and branch totals.
 - `python/html/index.html` and `native/index.html` are browsable annotated reports.

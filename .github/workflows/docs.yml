@@ -11,12 +11,13 @@ concurrency:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build:
     name: Build documentation
+    permissions:
+      contents: read
+      pages: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,6 +40,9 @@ jobs:
 
   deploy:
     name: Deploy documentation
+    permissions:
+      pages: write
+      id-token: write
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

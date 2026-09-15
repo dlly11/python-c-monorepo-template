@@ -9,7 +9,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repository_metadata import ROOT, VERSION_PATTERN, python_projects, version_errors
+from repository_metadata import (
+    ROOT,
+    VERSION_PATTERN,
+    cmake_project_version,
+    python_projects,
+    version_errors,
+)
 
 
 def replace_once(contents: str, pattern: re.Pattern[str], replacement: str, path: Path) -> str:
@@ -35,12 +41,9 @@ def update_version(root: Path, version: str) -> None:
             originals[path].decode("utf-8"), pattern, rf"\g<1>{version}\g<2>", path
         )
     cmake = Path("CMakeLists.txt")
-    updates[cmake] = replace_once(
-        originals[cmake].decode("utf-8"),
-        re.compile(r"(\bVERSION\s+)[0-9]+\.[0-9]+\.[0-9]+\b"),
-        rf"\g<1>{version}",
-        cmake,
-    )
+    contents = originals[cmake].decode("utf-8")
+    _, start, end = cmake_project_version(contents)
+    updates[cmake] = contents[:start] + version + contents[end:]
     try:
         for path, contents in updates.items():
             (root / path).write_bytes(contents.encode("utf-8"))

@@ -111,13 +111,98 @@ def project_metadata(root: Path, path: Path) -> tuple[str, str]:
     return normalized_name(project["name"]), str(project["version"])
 
 
+@dataclass(frozen=True)
+class _CMakeToken:
+    """An argument or delimiter with offsets into the unchanged source text."""
+
+    value: str
+    start: int
+    end: int
+    kind: str
+
+
+def _cmake_tokens(contents: str) -> list[_CMakeToken]:
+    """Skip comments and preserve quoted arguments without evaluating CMake code."""
+    pattern = re.compile(
+        r"(?P<space>\s+)|(?P<bracket>#?\[=*\[)|(?P<comment>\#[^\r\n]*)"
+        r'|(?P<quoted>"(?:\\[\s\S]|[^"\\])*")|(?P<paren>[()])'
+        r'|(?P<word>(?:\\[\s\S]|"(?:\\[\s\S]|[^"\\])*"|[^\s()#"\\])+)'
+    )
+    tokens = []
+    position = 0
+    while position < len(contents):
+        match = pattern.match(contents, position)
+        if match is None:
+            raise ValueError("CMakeLists.txt: unsupported or unterminated argument")
+        kind = str(match.lastgroup)
+        start, end = match.span()
+        position = end
+        if kind in {"space", "comment"}:
+            continue
+        if kind == "bracket":
+            opening = match.group().lstrip("#")
+            closing = "]" + "=" * (len(opening) - 2) + "]"
+            end = contents.find(closing, position)
+            if end < 0:
+                raise ValueError("CMakeLists.txt: unterminated bracket argument or comment")
+            position = end + len(closing)
+            if match.group().startswith("#"):
+                continue
+            start = match.end()
+            # CMake discards a newline immediately following a bracket opening.
+            if contents.startswith("\r\n", start):
+                start += 2
+            elif contents.startswith("\n", start):
+                start += 1
+        elif kind == "quoted":
+            start += 1
+            end -= 1
+        tokens.append(_CMakeToken(contents[start:end], start, end, kind))
+    return tokens
+
+
+def cmake_project_version(contents: str) -> tuple[str, int, int]:
+    """Locate one literal project VERSION and its span; reject ambiguous declarations."""
+    tokens = _cmake_tokens(contents)
+    projects = []
+    depth = 0
+    project_start = None
+    for index, token in enumerate(tokens):
+        if token.kind != "paren":
+            continue
+        if token.value == "(":
+            if depth == 0 and index > 0:
+                command = tokens[index - 1]
+                if command.kind == "word" and command.value.lower() == "project":
+                    project_start = index + 1
+            depth += 1
+        else:
+            depth -= 1
+            if depth < 0:
+                raise ValueError("CMakeLists.txt: unmatched closing parenthesis")
+            if depth == 0 and project_start is not None:
+                projects.append(tokens[project_start:index])
+                project_start = None
+    if depth or len(projects) != 1:
+        raise ValueError("CMakeLists.txt: require exactly one complete project(...) declaration")
+    arguments = projects[0]
+    versions = [index for index, token in enumerate(arguments[1:], 1) if token.value == "VERSION"]
+    if (
+        len(versions) != 1
+        or versions[0] + 1 >= len(arguments)
+        or any(token.kind == "paren" for token in arguments)
+    ):
+        raise ValueError("CMakeLists.txt: project(...) must declare exactly one literal VERSION")
+    version = arguments[versions[0] + 1]
+    if VERSION_PATTERN.fullmatch(version.value) is None:
+        raise ValueError("CMakeLists.txt: project VERSION must be literal X.Y.Z, not an expression")
+    return version.value, version.start, version.end
+
+
 def cmake_version(root: Path) -> str:
     """Return the version declared by the root CMake project."""
     contents = (root / "CMakeLists.txt").read_text(encoding="utf-8")
-    match = re.search(r"\bVERSION\s+(\d+\.\d+\.\d+)\b", contents)
-    if match is None:
-        raise ValueError("CMakeLists.txt does not declare a project VERSION")
-    return match.group(1)
+    return cmake_project_version(contents)[0]
 
 
 def locked_versions(root: Path) -> dict[str, str]:

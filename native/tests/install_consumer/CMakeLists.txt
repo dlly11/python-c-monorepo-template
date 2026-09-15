@@ -25,3 +25,4 @@ target_link_libraries(
 
 enable_testing()
 add_test(NAME installed.native.cpp_consumer COMMAND native_install_consumer)
+set_tests_properties(installed.native.cpp_consumer PROPERTIES TIMEOUT 60)

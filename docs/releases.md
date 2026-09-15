@@ -38,6 +38,12 @@ Normal releases must go through Release Please. The manual command does not crea
 a tag, or a GitHub Release. It validates declarations before writing and restores original bytes
 after errors or Ctrl+C; this is rollback, not a filesystem-wide atomic transaction.
 
+The root CMake file must contain one `project(...)` declaration with a literal `VERSION X.Y.Z`
+(quoted literals are also accepted). The checker and setter ignore minimum CMake requirements and
+version text in comments or descriptions. Missing, ambiguous, or variable-based project versions
+fail validation; the setter rejects them before writing any files. Keep the Release Please
+annotation beside the project version.
+
 Dependency lower bounds such as `example-core>=0.1.0` are compatibility statements rather than
 the current release number. Increase one only when a component starts using an API unavailable in
 the older compatible version.

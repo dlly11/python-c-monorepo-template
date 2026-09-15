@@ -84,19 +84,20 @@ def write_summary(failures: list[str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Run both coverage suites and retain every report that can be generated."""
     argparse.ArgumentParser(description=__doc__).parse_args(argv)
+    required_tools = ("pytest", "cmake", "ctest", "ninja", "gcc", "g++", "gcov", "gcovr")
+    missing_tools = [tool for tool in required_tools if shutil.which(tool) is None]
+    if missing_tools:
+        print(f"coverage checks failed: missing tools: {', '.join(missing_tools)}", file=sys.stderr)
+        print(
+            "No fresh results generated; existing coverage reports are unchanged.", file=sys.stderr
+        )
+        return 1
+
     if BUILD_ROOT.exists():
         shutil.rmtree(BUILD_ROOT)
     PYTHON_REPORT_ROOT.mkdir(parents=True)
     NATIVE_REPORT_ROOT.mkdir(parents=True)
-
     failures: list[str] = []
-    required_tools = ("pytest", "cmake", "ctest", "ninja", "gcc", "g++", "gcov", "gcovr")
-    missing_tools = [tool for tool in required_tools if shutil.which(tool) is None]
-    if missing_tools:
-        failures.append(f"missing tools: {', '.join(missing_tools)}")
-        write_summary(failures)
-        print(f"coverage checks failed: {failures[0]}", file=sys.stderr)
-        return 1
 
     python_status = run_check(
         "Python tests and coverage",
