@@ -85,6 +85,10 @@ inherited changelog with your project's initial history. The setter deliberately
 Release Please state, create tags, or publish a release. Subsequent releases use the normal
 [release workflow](releases.md); do not reset version history in an already released fork.
 Configure Pages and required checks using that guide before relying on automation.
+Review `tools/github/repository-policy.json` and run
+`uv run python scripts/check_github_settings.py --repo OWNER/REPO` after configuring the new
+repository. The audit reports drift without applying settings; see the release guide for access
+requirements and exit codes. Keep policy and workflow branch/check names aligned when renaming.
 
 ## 4. Find leftovers and validate
 

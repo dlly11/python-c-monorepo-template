@@ -1,12 +1,14 @@
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 permissions:
@@ -18,16 +20,35 @@ permissions:
 jobs:
   release-please:
     name: Prepare or create release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
     steps:
+      - name: Check out release gate from main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Require successful push CI for current main
+        id: readiness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_release_readiness.py
       - name: Run Release Please
+        if: steps.readiness.outputs.ready == 'true'
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          target-branch: main
           config-file: tools/release-please/config.json
           manifest-file: tools/release-please/manifest.json
 

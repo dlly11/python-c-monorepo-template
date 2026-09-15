@@ -130,3 +130,8 @@ Keep isolated pre-commit hook revisions aligned when upgrading their correspondi
 (especially Ruff). The uv executable, hook revisions, GitHub Actions versions, and native tools are
 not pinned by `uv.lock`; review their own configuration or installation source separately.
 Use the existing [contribution commands](CONTRIBUTING.md) and [testing guide](testing.md).
+
+Dependabot uses an explicit `chore` commit prefix with a dependency scope for uv, GitHub Actions,
+and pre-commit updates. Subjects such as `chore(deps): bump dependency` and
+`chore(deps-dev): update tools` satisfy the Conventional Commit policy without relying on inferred
+repository style. Weekly schedules and update groups are configured in `.github/dependabot.yml`.

@@ -195,6 +195,11 @@ The full compilation-database-aware clang-tidy analysis remains in the CMake ana
 
 ## Versioning and releases
 
+Release automation waits for successful push CI on the current `main` commit. To audit the
+repository's merge and branch-protection settings against the checked-in policy, run
+`uv run python scripts/check_github_settings.py` with an authenticated GitHub CLI. This read-only
+command is run manually; see [the release guide](docs/releases.md) for setup and retry procedures.
+
 All Python and native components share one Semantic Versioning release number. Native CMake builds
 generate and install a version header for each library and the CLI from that value. Release Please
 uses Conventional Commits on `main`, with squash commit subjects taken from validated PR titles,

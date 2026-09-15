@@ -1,0 +1,44 @@
+"""Small read-only GitHub CLI helpers for repository checks."""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from typing import Any
+
+
+def gh(*arguments: str) -> str:
+    """Run a bounded GitHub CLI read and retain actionable error messages."""
+    try:
+        return subprocess.run(
+            ["gh", *arguments],
+            check=True,
+            capture_output=True,
+            encoding="utf-8",
+            timeout=30,
+        ).stdout
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(f"GitHub read failed: {error.stderr.strip()}") from error
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"cannot run GitHub CLI: {error}") from error
+
+
+def api(endpoint: str) -> dict[str, Any]:
+    """Read a JSON object; callers never issue API mutations."""
+    result = json.loads(gh("api", "--method", "GET", endpoint))
+    if not isinstance(result, dict):
+        raise ValueError("GitHub API response must be a JSON object")
+    return result
+
+
+def repository_name(value: str | None = None) -> str:
+    """Resolve OWNER/REPO explicitly or from the current checkout."""
+    name = (
+        value
+        if value is not None
+        else gh("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner").strip()
+    )
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", name) is None:
+        raise ValueError(f"expected OWNER/REPO, found {name!r}")
+    return name
