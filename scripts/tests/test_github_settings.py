@@ -45,7 +45,8 @@ def test_match_ignores_unmanaged_fields_and_check_order(
 
 
 @pytest.mark.parametrize(
-    "change", ["merge", "protection", "missing", "additional", "source", "reviews"]
+    "change",
+    ["merge", "merge_title", "linear", "protection", "missing", "additional", "source", "reviews"],
 )
 def test_reports_policy_drift(
     settings_context: tuple[ModuleType, dict[str, Any]],
@@ -55,7 +56,11 @@ def test_reports_policy_drift(
     module, state = settings_context
     checks = state["protection"]["required_status_checks"]["checks"]
     if change == "merge":
-        state["repository"]["allow_merge_commit"] = True
+        state["repository"]["allow_merge_commit"] = False
+    elif change == "merge_title":
+        state["repository"]["merge_commit_title"] = "MERGE_MESSAGE"
+    elif change == "linear":
+        state["protection"]["required_linear_history"]["enabled"] = True
     elif change == "protection":
         state["protected"] = False
     elif change == "missing":
@@ -74,7 +79,7 @@ def test_all_differences_are_reported(
     settings_context: tuple[ModuleType, dict[str, Any]], capsys: pytest.CaptureFixture[str]
 ) -> None:
     module, state = settings_context
-    state["repository"].update(allow_merge_commit=True, allow_rebase_merge=True)
+    state["repository"].update(allow_merge_commit=False, allow_rebase_merge=True)
     assert module.main() == 1
     output = capsys.readouterr().err
     assert "allow_merge_commit" in output and "allow_rebase_merge" in output

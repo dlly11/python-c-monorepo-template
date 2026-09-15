@@ -150,9 +150,10 @@ def check_ci_run(
 
 
 def merged_pr(repository: str, commit: str) -> dict[str, Any]:
-    """Require a conventional squash commit associated with one merged main PR."""
-    if len(git("show", "--no-patch", "--format=%P", commit, "--").split()) != 1:
-        raise ValueError(f"{commit}: expected a squash commit with one parent")
+    """Require a conventional squash or two-parent merge of one GitHub main PR."""
+    parents = git("show", "--no-patch", "--format=%P", commit, "--").split()
+    if len(parents) not in {1, 2}:
+        raise ValueError(f"{commit}: expected a squash commit or two-parent merge commit")
     if not check_message(git("show", "--no-patch", "--format=%B", commit, "--"), commit[:12]):
         raise ValueError("merged commit subject is not conventional")
     candidates = items(f"repos/{repository}/commits/{commit}/pulls?per_page=100")
@@ -166,7 +167,17 @@ def merged_pr(repository: str, commit: str) -> dict[str, Any]:
     ]
     if len(candidates) != 1:
         raise ValueError(f"{commit}: expected exactly one merged PR targeting main")
-    return api(f"repos/{repository}/pulls/{candidates[0]['number']}")
+    pr = api(f"repos/{repository}/pulls/{candidates[0]['number']}")
+    if len(parents) == 2:
+        if parents[1] != pr["head"]["sha"]:
+            raise ValueError(f"{commit}: merge second parent does not match the PR head")
+        # These commits remain in main's history. Check them during recovery too, where
+        # fresh manual CI on main has no new commit range to lint.
+        introduced = git("rev-list", f"{parents[0]}..{parents[1]}", "--").splitlines()
+        for sha in introduced:
+            if not check_message(git("show", "--no-patch", "--format=%B", sha, "--"), sha[:12]):
+                raise ValueError("merged PR commit subject is not conventional")
+    return pr
 
 
 def required_ci_jobs() -> set[str]:

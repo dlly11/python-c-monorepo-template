@@ -71,9 +71,12 @@ def repository(
 REPOSITORY = "owner/project"
 
 
-@pytest.fixture
+@pytest.fixture(params=["squash", "merge"])
 def merge_context(
-    scripts: dict[str, ModuleType], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    scripts: dict[str, ModuleType],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
 ) -> tuple[ModuleType, dict[str, Any]]:
     module = scripts["github_checks"]
     cli = scripts["check_merge"]
@@ -99,7 +102,12 @@ def merge_context(
     git("commit", "-am", "fix: change contents")
     head = git("rev-parse", "HEAD")
     tree = git("rev-parse", "HEAD^{tree}")
-    merge = git("commit-tree", tree, "-p", base, "-m", "fix: change contents (#1)")
+    parents = ["-p", base]
+    if request.param == "merge":
+        # Preserve multiple commits; only their final integrated tree was tested.
+        head = git("commit-tree", tree, "-p", head, "-m", "docs: explain the change")
+        parents.extend(["-p", head])
+    merge = git("commit-tree", tree, *parents, "-m", "fix: change contents (#1)")
     git("update-ref", "refs/heads/main", merge)
     required = {
         check["context"]
@@ -126,6 +134,7 @@ def merge_context(
     }
     state: dict[str, Any] = {
         "cli": cli,
+        "method": request.param,
         "base": base,
         "head": head,
         "merge": merge,

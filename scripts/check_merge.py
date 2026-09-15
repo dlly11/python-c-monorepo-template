@@ -1,4 +1,4 @@
-"""Record tested PR contents and verify squash merges without repeating the test suite."""
+"""Record tested PR contents and verify squash or merge commits without repeating tests."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from repository_metadata import git
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Record PR validation or check every new main commit against its tested PR."""
+    """Record PR validation or check each new first-parent main commit against its PR."""
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
