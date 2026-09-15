@@ -1,4 +1,4 @@
-"""Record tested PR contents and verify squash or merge commits without repeating tests."""
+"""Record tested PR contents and verify GitHub squash, merge, or rebase integrations."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from repository_metadata import git
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Record PR validation or check each new first-parent main commit against its PR."""
+    """Record PR validation or account for every new main commit through tested PRs."""
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
@@ -43,8 +43,13 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("push verification requires at least one new main commit")
         required = required_ci_jobs()
         workflow_id = api(f"repos/{repository}/actions/workflows/ci.yml")["id"]
-        for commit in commits:
-            verify_commit(repository, commit, required, workflow_id)
+        while commits:
+            integration = verify_commit(repository, commits[-1], required, workflow_id)
+            if not integration or commits[-len(integration) :] != integration:
+                raise ValueError(
+                    "push boundary splits a PR integration or its commits are not contiguous"
+                )
+            del commits[-len(integration) :]
     except (
         KeyError,
         OSError,

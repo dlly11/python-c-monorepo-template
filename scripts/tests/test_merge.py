@@ -20,11 +20,13 @@ def test_merge_sha_changes_but_tested_tree_matches(
     assert state["cli"].main() == 0
 
 
+@pytest.mark.parametrize("second_method", ["squash", "merge", "rebase"])
 def test_push_can_mix_merge_methods(
     merge_context: tuple[ModuleType, dict[str, Any]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    second_method: str,
 ) -> None:
     module, state = merge_context
     git = state["git"]
@@ -33,9 +35,15 @@ def test_push_can_mix_merge_methods(
     tree = git("write-tree")
     head = git("commit-tree", tree, "-p", state["merge"], "-m", "feat: second change")
     parents = ["-p", state["merge"]]
-    if state["method"] == "squash":
+    if second_method == "merge":
         parents.extend(["-p", head])
     merged = git("commit-tree", tree, *parents, "-m", "feat: second change (#2)")
+    integration = [merged]
+    if second_method == "rebase":
+        head = git("commit-tree", tree, "-p", head, "-m", "docs: explain second change")
+        final = git("commit-tree", tree, "-p", merged, "-m", "docs: explain second change")
+        integration.append(final)
+        merged = final
     pr = deepcopy(state["pr"])
     pr.update(number=2, merge_commit_sha=merged)
     pr["head"].update(sha=head, ref="second-topic")
@@ -51,7 +59,7 @@ def test_push_can_mix_merge_methods(
         return original_api(endpoint)
 
     def items(endpoint: str, key: str | None = None) -> list[dict[str, Any]]:
-        if f"/commits/{merged}/pulls?" in endpoint:
+        if any(f"/commits/{sha}/pulls?" in endpoint for sha in integration):
             return [pr]
         if f"head_sha={head}" in endpoint:
             return [run]

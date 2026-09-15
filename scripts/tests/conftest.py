@@ -71,7 +71,7 @@ def repository(
 REPOSITORY = "owner/project"
 
 
-@pytest.fixture(params=["squash", "merge"])
+@pytest.fixture(params=["squash", "merge", "rebase"])
 def merge_context(
     scripts: dict[str, ModuleType],
     tmp_path: Path,
@@ -108,6 +108,26 @@ def merge_context(
         head = git("commit-tree", tree, "-p", head, "-m", "docs: explain the change")
         parents.extend(["-p", head])
     merge = git("commit-tree", tree, *parents, "-m", "fix: change contents (#1)")
+    integration = [merge]
+    if request.param == "rebase":
+        # GitHub preserves messages but rewrites committer metadata and SHAs.
+        original_first = head
+        source.write_text("final rebased contents\n", encoding="utf-8")
+        git("commit", "-am", "feat: complete the change")
+        head = git("rev-parse", "HEAD")
+        tree = git("rev-parse", "HEAD^{tree}")
+        with monkeypatch.context() as replay:
+            replay.setenv("GIT_COMMITTER_DATE", "2001-01-01T00:00:00Z")
+            first = git(
+                "commit-tree",
+                git("rev-parse", f"{original_first}^{{tree}}"),
+                "-p",
+                base,
+                "-m",
+                "fix: change contents",
+            )
+            merge = git("commit-tree", tree, "-p", first, "-m", "feat: complete the change")
+        integration = [first, merge]
     git("update-ref", "refs/heads/main", merge)
     required = {
         check["context"]
@@ -138,6 +158,7 @@ def merge_context(
         "base": base,
         "head": head,
         "merge": merge,
+        "integration": integration,
         "tree": tree,
         "pr": pr,
         "runs": [run],
@@ -166,6 +187,9 @@ def merge_context(
 
     def items(endpoint: str, key: str | None = None) -> list[dict[str, Any]]:
         if "/commits/" in endpoint:
+            sha = endpoint.split("/commits/", 1)[1].split("/", 1)[0]
+            if sha not in {*state["integration"], state["pr"]["merge_commit_sha"]}:
+                return []
             return state["candidates"]
         return state["jobs"] if key == "jobs" else state["runs"]
 

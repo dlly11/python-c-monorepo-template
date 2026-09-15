@@ -360,7 +360,7 @@ def test_bootstrap_root_cannot_use_recovery(
     state["merge"] = state["base"]
     state["current"] = state["base"]
     state["runs"][0]["head_sha"] = state["base"]
-    with pytest.raises(ValueError, match="squash commit or two-parent merge commit"):
+    with pytest.raises(ValueError, match="one-parent commit or two-parent merge commit"):
         recover(module, state)
 
 
