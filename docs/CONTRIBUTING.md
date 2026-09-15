@@ -7,31 +7,9 @@ Use the [workstation guide](workstation.md) for setup and diagnostics, the
 [adoption guide](adopting.md) when changing template names or adding components, and the
 [dependency guide](dependencies.md) when adding or upgrading libraries and tools.
 
-Before opening a pull request, run:
-
-```bash
-uv sync --locked --all-packages
-uv run pre-commit run actionlint --all-files
-uv run ruff check .
-uv run ruff format --check .
-uv run python scripts/check_workspace.py
-uv run python scripts/check_python.py
-uv run python scripts/check_versions.py
-uv run pytest
-uv run python scripts/check_python_install.py
-uv sync --locked --all-packages --group coverage
-uv run --group coverage python scripts/check_coverage.py
-uv sync --locked --all-packages --group docs
-uv run --group docs python scripts/build_docs.py
-
-cmake --preset analysis
-cmake --build --preset analysis
-cmake --build --preset analysis --target format-c-check
-ctest --preset analysis
-```
-
-The combined coverage command requires Linux and GCC. On macOS or Windows, run the other relevant
-checks locally and rely on the existing Linux coverage job for that workflow.
+Before opening a pull request, run the relevant [local validation commands](testing.md#local-validation).
+The full Linux checklist runs pytest through coverage once. Other platforms can run Python tests
+and native checks locally, with coverage enforced by Linux CI.
 
 ## Commit messages and pull requests
 
@@ -42,8 +20,7 @@ Use a Conventional Commit subject for every new commit and the PR title, for exa
 uv run pre-commit install
 ```
 
-Run this again in existing clones: installing only the earlier `pre-commit` hook does not install
-the new `commit-msg` hook. The message hook checks the first line, sharing the same policy as the
+The message hook checks the first line, sharing the same policy as the
 PR-title validator. Bodies and footers remain free-form. File checks run at the `pre-commit` stage.
 
 Manual checks:
@@ -87,8 +64,19 @@ Manual title workflow runs must select the open PR's current head branch in this
 its matching PR number. The workflow verifies the head repository, branch, and commit before
 checking the live title. Ordinary PR events also validate fork PRs using their actual head commit.
 
-The normal pytest command also runs the repository script tests. See [the release guide](releases.md)
-for the allowed types, enforced ranges, GitHub settings, and release process.
+The subject format is `type(scope)!: description`; scope and `!` are optional. Allowed types are
+`build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and `test`.
+Types and scopes are lowercase. Scopes start with a letter or digit and can contain letters,
+digits, `.`, `_`, `/`, and `-`. Descriptions must be nonempty with no surrounding whitespace or
+control characters. This is the repository's subset of [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
+implemented in `scripts/conventional_commits.py`. See [CI event behavior](testing.md#pr-and-post-merge-responsibilities)
+for checked commit ranges, and [releases](releases.md#conventional-commits) for version effects.
+
+## Existing clone migration
+
+After pulling hook changes, rerun `uv run pre-commit install` to install both hooks. Repositories
+using the former CI layout should remove the separate **Python 3.12** required check: **Coverage**
+now provides it. Keep the remaining protection settings aligned with the [repository policy](releases.md#github-repository-settings).
 
 ## Change requirements
 
@@ -108,6 +96,6 @@ The PR template provides short prompts for the change, validation, compatibility
 documentation. Use N/A for sections that do not apply.
 
 Documentation is written in MyST Markdown. Keep package and application guidance within that
-component's `docs` directory, add new pages to a local toctree, and use standard fenced Mermaid
+component's `docs` directory, keep overview, examples, and API reference in `docs/index.md`, and use standard fenced Mermaid
 blocks so diagrams render both on GitHub and in Sphinx. The documentation build treats Sphinx and
 Doxygen warnings as errors.

@@ -4,25 +4,22 @@ Use the section for your operating system, then run the common initialization co
 repository root. Git is assumed to be installed. Python-only work needs just Python and uv;
 native, analysis, documentation, and coverage tools can be installed when those workflows are needed.
 
-## Requirements and validated versions
+## Requirements
 
-| Tool | Requirement | Validated on the Linux development host |
-| --- | --- | --- |
-| Python | 3.12 or newer; CI tests 3.12, 3.13, and 3.14 | 3.12.14 |
-| uv | 0.10.9 or newer for workspace build constraints | 0.12.11 |
-| CMake | 3.25 or newer | 4.4.2 |
-| Ninja | Required by the presets | 1.13.2 |
-| C / C++ compiler | C17 / C++17; C++ is needed for native tests | GCC/G++ 15.3.0 |
-| clang-format / clang-tidy | Required for the analysis workflow | 21.1.8 |
-| cppcheck | Required for the analysis workflow | 2.21.1 |
-| Doxygen | 1.9.2 or newer | 1.17.0 |
-| gcov | From the same GCC toolchain used for coverage | 15.3.0 |
+| Tool | Requirement |
+| --- | --- |
+| Python | 3.12 or newer |
+| uv | The root `tool.uv.required-version` constraint |
+| CMake | 3.25 or newer |
+| Ninja | Required by the presets |
+| C / C++ compiler | C17 / C++17; C++ is needed for native tests |
+| clang-format / clang-tidy / cppcheck | Required for native analysis |
+| Doxygen | 1.9.2 or newer |
+| gcov | The same GCC toolchain used for coverage |
 
-These validated versions are a development-host snapshot, not minimums or pinned CI image versions.
-The package-manager recipes below may install different versions. The current CI uses GCC on Linux,
-Apple Clang on macOS, and MinGW GCC on Windows; native analysis and coverage run on Linux.
-The macOS and Windows setup recipes have been checked against upstream instructions but have not
-been executed on those operating systems during this change.
+CI uses GCC on Linux, Apple Clang on macOS, and MinGW GCC on Windows. Native analysis and coverage
+run on Linux. System tools come from your platform or approved development image; Python tool
+versions are declared in `pyproject.toml` and resolved in `uv.lock`.
 
 ## Ubuntu 24.04 or newer
 
@@ -105,7 +102,7 @@ Run the common commands below from PowerShell using uv's managed CPython. Do not
 for the workspace. For persistence, add the UCRT64 directory to your user PATH through Windows
 environment settings. Native coverage and the sanitizer preset are unavailable on Windows.
 
-## Initialize and validate the checkout
+## Initialize the checkout
 
 From the repository root, these commands work in Bash, Zsh, and PowerShell:
 
@@ -113,39 +110,17 @@ From the repository root, these commands work in Bash, Zsh, and PowerShell:
 uv python install 3.12
 uv sync --locked --all-packages
 uv run python scripts/doctor.py --profile python
-uv run pytest
-uv run python scripts/check_python_install.py
 ```
 
-For native development:
+For native work, set `CC` and `CXX` before the first CMake configure. Use a fresh build directory
+when changing compiler families: an existing cache retains its compiler selection. Check native
+prerequisites with `python scripts/doctor.py --profile native`, or use `--profile analysis` for
+the static analysis tools. See [native dependency setup](native-quality.md#cpputest-dependency-policy)
+for restricted/offline builds.
 
-```text
-uv run python scripts/doctor.py --profile native
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
-```
-
-Set `CC` and `CXX` before the first CMake configure. When changing compiler families, use a fresh
-build directory; an existing CMake cache retains its compiler selection. Native tests fetch
-CppUTest on first configure. Restricted environments can pass
-`-DFETCHCONTENT_SOURCE_DIR_CPPUTEST=/approved/sources/cpputest` to configure with an existing
-CppUTest 4.0 source tree. Also set `-DFETCHCONTENT_FULLY_DISCONNECTED=ON` when network access must
-be disabled.
-
-Select optional workflows explicitly:
-
-```text
-uv run python scripts/doctor.py --profile analysis
-uv sync --locked --all-packages --group docs
-uv run --group docs python scripts/doctor.py --profile docs
-uv run --group docs python scripts/build_docs.py
-```
-
-On Linux, also synchronize the `coverage` group and follow the [coverage guide](testing.md).
-Install both the `pre-commit` and `commit-msg` hooks with `uv run pre-commit install` after the
-analysis tools are available. Existing clones must rerun this command to add the message hook.
-See [Contributing](CONTRIBUTING.md) for the Conventional Commit policy and repair commands.
+Install local hooks as described in [Contributing](CONTRIBUTING.md), then follow the
+[local validation commands](testing.md#local-validation). Documentation and coverage use optional
+uv dependency groups, installed by those commands.
 
 ## Understanding doctor output
 
@@ -172,14 +147,14 @@ Doctor checks system prerequisites, not Python dependency-group contents or C/C+
 Use `uv sync --locked` with the appropriate group to install Python tools, then run the actual
 [quality checks](CONTRIBUTING.md) to validate the resulting toolchain.
 
-The root uv configuration pins setuptools to 84.0.0 for editable installs and distribution builds.
+The root uv configuration pins setuptools for editable installs and distribution builds.
 You do not need to install setuptools globally. See the [backend upgrade procedure](dependencies.md)
 when deliberately changing that pin.
 
 ## GitHub workflow editing
 
 Run `uv run pre-commit run actionlint --all-files` before submitting workflow changes. The official
-hook is pinned to actionlint v1.7.12 and uses pre-commit's managed Go environment. First use downloads
+hook revision is pinned in `.pre-commit-config.yaml` and uses pre-commit's managed Go environment. First use downloads
 and builds the tool and may take longer; subsequent local runs reuse that environment. Allow access
 to GitHub and Go toolchain/module downloads when initializing it. Go is a hook build dependency,
 not a Python workspace dependency or a requirement for ordinary Python execution.
