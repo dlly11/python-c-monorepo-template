@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.2...v0.4.3) (2026-09-15)
+
+
+### Bug Fixes
+
+* strengthen release validation and recovery ([#14](https://github.com/dlly11/python-c-monorepo-template/issues/14)) ([98ae6c5](https://github.com/dlly11/python-c-monorepo-template/commit/98ae6c5b9b2e69700bd63bd4d71314ec4d35d85a))
+
 ## [0.4.2](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.1...v0.4.2) (2026-09-15)
 
 
