@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.3.0...v0.4.0) (2026-09-15)
+
+
+### Features
+
+* **native:** add CppUTest and version headers ([8689d1c](https://github.com/dlly11/python-c-monorepo-template/commit/8689d1caac9e7f4e542ace52790a9bf454ec3da0))
+
+
+### Bug Fixes
+
+* **ci:** make install check cross-platform ([8681564](https://github.com/dlly11/python-c-monorepo-template/commit/8681564fdadc56fabb69106fc341810ce67a9f64))
+
 ## [0.3.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.2.0...v0.3.0) (2026-09-14)
 
 
