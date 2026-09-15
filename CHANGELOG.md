@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.6.0...v1.0.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **tools:** package repository maintenance commands ([#24](https://github.com/dlly11/python-c-monorepo-template/issues/24))
+* **tools:** package repository maintenance commands
+
+### Code Refactoring
+
+* **tools:** package repository maintenance commands ([5dbe539](https://github.com/dlly11/python-c-monorepo-template/commit/5dbe539a5d82874b648cf0a49cd87c520bbc42fd))
+* **tools:** package repository maintenance commands ([#24](https://github.com/dlly11/python-c-monorepo-template/issues/24)) ([0023ede](https://github.com/dlly11/python-c-monorepo-template/commit/0023ede9dad0e8c7bdc53d74c894df1895a29e33))
+
 ## [0.6.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.5.0...v0.6.0) (2026-09-15)
 
 
