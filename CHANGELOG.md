@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.1...v1.0.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* **tools:** validate prerequisites before replacing outputs ([d1080db](https://github.com/dlly11/python-c-monorepo-template/commit/d1080dbc6c008b8e5d2fbb05f4119ef79ff21066))
+
 ## [1.0.1](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.0...v1.0.1) (2026-09-15)
 
 
