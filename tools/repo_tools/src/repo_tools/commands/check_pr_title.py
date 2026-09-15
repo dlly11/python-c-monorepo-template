@@ -40,13 +40,11 @@ def workflow_title(
     return pr["title"]
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument("title", nargs="?")
     parser.add_argument("--pr", type=int)
     parser.add_argument("--expected-head")
-    return parser
 
 
 def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
@@ -80,8 +78,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         return 1
     print(f"valid Conventional Commit pull request title: {title}")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

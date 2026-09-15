@@ -26,14 +26,12 @@ def commits_between(base: str, head: str, *, root: Path | None = None) -> list[s
     return git("rev-list", "--reverse", revision_range, "--", root=root).splitlines()
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--message-file", type=Path, help="message file supplied by commit-msg")
     source.add_argument("--base", help="exclude commits reachable from this ref or SHA")
     parser.add_argument("--head", default="HEAD", help="last commit to check (default: HEAD)")
-    return parser
 
 
 def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
@@ -57,8 +55,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         if isinstance(error, subprocess.CalledProcessError):
             print(error.stderr, file=sys.stderr)
         return 1
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -84,24 +85,10 @@ def test_source_launcher_without_site_packages(repository: Path, tmp_path: Path)
     assert list(outside.iterdir()) == []
 
 
-def test_explicit_root_selects_git_checkout(repository: Path) -> None:
-    subprocess.run(["git", "init", "--initial-branch=main", str(repository)], check=True)
-    subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repository),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "fix: selected checkout",
-        ],
-        check=True,
-    )
+def test_explicit_root_selects_git_checkout(repository: Path, git: Callable[..., str]) -> None:
+    git("init", "--initial-branch=main", str(repository))
+    git("-C", str(repository), "add", ".")
+    git("-C", str(repository), "commit", "-m", "fix: selected checkout")
     # Stay in the real checkout, whose history has many more commits.
     commits = check_commits.commits_between("0" * 40, "HEAD", root=repository)
     assert len(commits) == 1
@@ -109,7 +96,7 @@ def test_explicit_root_selects_git_checkout(repository: Path) -> None:
 
 
 def test_selected_checkout_supplies_policy(repository: Path) -> None:
-    policy = github_checks.load_policy()
+    policy = github_checks.load_policy(root=Path.cwd())
     policy["repository"]["default_branch"] = "selected-branch"
     path = repository / github_checks.POLICY
     path.parent.mkdir(parents=True)

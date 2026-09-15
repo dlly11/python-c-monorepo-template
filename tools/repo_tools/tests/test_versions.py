@@ -1,20 +1,23 @@
 """Version validation and transactional update regressions."""
 
 import subprocess
-import sys
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import Mock
 
 import pytest
+
+from repo_tools import cli, repository_metadata
+from repo_tools.commands import check_python, check_versions, set_version
 
 
 def snapshot(root: Path) -> dict[Path, bytes]:
     return {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
 
-def test_consistent_versions(repository: Path, modules: dict[str, ModuleType]) -> None:
-    checker = modules["check_versions"]
+def test_consistent_versions(
+    repository: Path,
+) -> None:
+    checker = check_versions
     assert checker.repository_version(repository) == "1.2.3"
     assert checker.version_errors(repository, "1.2.3", "v1.2.3") == []
 
@@ -23,55 +26,57 @@ def test_consistent_versions(repository: Path, modules: dict[str, ModuleType]) -
     "version", ["1.2", "01.2.3", "1.2.3-rc1", "garbage", "", "\u0661.\u0662.\u0663"]
 )
 def test_invalid_canonical_version(
-    version: str, repository: Path, modules: dict[str, ModuleType]
+    version: str,
+    repository: Path,
 ) -> None:
     (repository / "version.txt").write_text(version, encoding="utf-8")
     with pytest.raises(ValueError, match=r"must contain X\.Y\.Z"):
-        modules["check_versions"].repository_version(repository)
+        check_versions.repository_version(repository)
 
 
 @pytest.mark.parametrize("relative_path", ["pyproject.toml", "CMakeLists.txt", "uv.lock"])
 def test_stale_metadata(
-    relative_path: str, repository: Path, modules: dict[str, ModuleType]
+    relative_path: str,
+    repository: Path,
 ) -> None:
     path = repository / relative_path
     path.write_text(path.read_text(encoding="utf-8").replace("1.2.3", "1.2.2"), encoding="utf-8")
     assert any(
-        relative_path in error
-        for error in modules["check_versions"].version_errors(repository, "1.2.3")
+        relative_path in error for error in check_versions.version_errors(repository, "1.2.3")
     )
 
 
-def test_missing_locked_projects(repository: Path, modules: dict[str, ModuleType]) -> None:
+def test_missing_locked_projects(
+    repository: Path,
+) -> None:
     (repository / "uv.lock").write_text("package = []\n", encoding="utf-8")
-    errors = modules["check_versions"].version_errors(repository, "1.2.3")
-    assert len(errors) == len(modules["repository_metadata"].python_projects(repository))
+    errors = check_versions.version_errors(repository, "1.2.3")
+    assert len(errors) == len(repository_metadata.python_projects(repository))
     assert all("missing workspace project" in error for error in errors)
 
 
-def test_wrong_tag(repository: Path, modules: dict[str, ModuleType]) -> None:
-    assert modules["check_versions"].version_errors(repository, "1.2.3", "v1.2.2") == [
+def test_wrong_tag(
+    repository: Path,
+) -> None:
+    assert check_versions.version_errors(repository, "1.2.3", "v1.2.2") == [
         "release tag: expected v1.2.3, found v1.2.2"
     ]
 
 
 def test_malformed_metadata_is_reported(
     repository: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (repository / "pyproject.toml").write_text("[broken", encoding="utf-8")
-    monkeypatch.setattr(sys, "argv", ["check_versions.py"])
-    assert modules["check_versions"].main() == 1
-    assert "version check failed:" in capsys.readouterr().err
+    arguments = ["check-versions"]
+    assert cli.main(arguments, default_root=repository) == 1
+    assert "no repository workspace" in capsys.readouterr().err
 
 
-def test_set_version_success(
-    repository: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    setter = modules["set_version"]
-    monkeypatch.setattr(sys, "argv", ["set_version.py", "2.0.0"])
+def test_set_version_success(repository: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    setter = set_version
+    arguments = ["set-version", "2.0.0"]
     monkeypatch.setattr(setter.shutil, "which", lambda _: "/approved/bin/uv")
 
     def refresh_lock(*args: object, **kwargs: object) -> None:
@@ -82,24 +87,23 @@ def test_set_version_success(
 
     run = Mock(side_effect=refresh_lock)
     monkeypatch.setattr(setter.subprocess, "run", run)
-    assert setter.main() == 0
+    assert cli.main(arguments, default_root=repository) == 0
     run.assert_called_once_with(["uv", "lock"], cwd=repository, check=True)
-    assert modules["check_versions"].repository_version(repository) == "2.0.0"
-    assert modules["check_versions"].version_errors(repository, "2.0.0") == []
+    assert check_versions.repository_version(repository) == "2.0.0"
+    assert check_versions.version_errors(repository, "2.0.0") == []
 
 
 @pytest.mark.parametrize("failure", ["lock", "validation", "declaration", "interrupt"])
 def test_failed_update_restores_every_managed_file(
     failure: str,
     repository: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    setter = modules["set_version"]
+    setter = set_version
     if failure == "declaration":
         (repository / "CMakeLists.txt").write_text("project(example)\n", encoding="utf-8")
     before = snapshot(repository)
-    monkeypatch.setattr(sys, "argv", ["set_version.py", "2.0.0"])
+    arguments = ["set-version", "2.0.0"]
     monkeypatch.setattr(setter.shutil, "which", lambda _: "/approved/bin/uv")
 
     def fail_lock(*args: object, **kwargs: object) -> None:
@@ -111,7 +115,7 @@ def test_failed_update_restores_every_managed_file(
     # Returning without refreshing the lock causes the real post-update checker to fail.
     run = Mock(side_effect=fail_lock if failure in {"lock", "interrupt"} else None)
     monkeypatch.setattr(setter.subprocess, "run", run)
-    assert setter.main() == (130 if failure == "interrupt" else 1)
+    assert cli.main(arguments, default_root=repository) == (130 if failure == "interrupt" else 1)
     assert snapshot(repository) == before
     if failure == "declaration":
         run.assert_not_called()
@@ -121,20 +125,19 @@ def test_failed_update_restores_every_managed_file(
 def test_rejected_update_does_not_write(
     missing_uv: bool,
     repository: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     before = snapshot(repository)
-    monkeypatch.setattr(sys, "argv", ["set_version.py", "2.0.0" if missing_uv else "invalid"])
-    monkeypatch.setattr(modules["set_version"].shutil, "which", lambda _: None)
+    arguments = ["set-version", "2.0.0" if missing_uv else "invalid"]
+    monkeypatch.setattr(set_version.shutil, "which", lambda _: None)
     with pytest.raises(SystemExit) as error:
-        modules["set_version"].main()
+        cli.main(arguments, default_root=repository)
     assert error.value.code == 2
     assert snapshot(repository) == before
 
 
 def test_new_member_is_discovered_by_version_setter_and_type_checks(
-    repository: Path, modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+    repository: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     member = repository / "python/packages/added"
     namespace = member / "src/added"
@@ -153,11 +156,11 @@ def test_new_member_is_discovered_by_version_setter_and_type_checks(
             lock.write_text(lock.read_text().replace("1.2.3", "2.0.0"), encoding="utf-8")
 
     monkeypatch.setattr(subprocess, "run", run)
-    modules["check_python"].check_projects(repository)
+    check_python.check_projects(repository)
     assert ["ty", "check", "--project", str(member)] in commands
-    modules["set_version"].update_version(repository, "2.0.0")
+    set_version.update_version(repository, "2.0.0")
     assert 'version = "2.0.0"' in metadata.read_text()
-    assert modules["repository_metadata"].version_errors(repository, "2.0.0") == []
+    assert repository_metadata.version_errors(repository, "2.0.0") == []
 
 
 @pytest.mark.parametrize(
@@ -173,7 +176,6 @@ def test_new_member_is_discovered_by_version_setter_and_type_checks(
 )
 def test_cmake_version_update_only_changes_project_literal(
     repository: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     declaration: str,
 ) -> None:
@@ -185,7 +187,7 @@ def test_cmake_version_update_only_changes_project_literal(
     )
     cmake = repository / "CMakeLists.txt"
     cmake.write_bytes(contents.encode())
-    metadata = modules["repository_metadata"]
+    metadata = repository_metadata
     assert metadata.cmake_version(repository) == "1.2.3"
 
     def refresh(*args: object, **kwargs: object) -> None:
@@ -193,7 +195,7 @@ def test_cmake_version_update_only_changes_project_literal(
         lock.write_text(lock.read_text().replace("1.2.3", "2.0.0"), encoding="utf-8")
 
     monkeypatch.setattr(subprocess, "run", refresh)
-    modules["set_version"].update_version(repository, "2.0.0")
+    set_version.update_version(repository, "2.0.0")
     assert (
         cmake.read_bytes()
         == contents.replace(declaration, declaration.replace("1.2.3", "2.0.0")).encode()
@@ -225,7 +227,6 @@ def test_cmake_version_update_only_changes_project_literal(
 )
 def test_invalid_cmake_project_is_rejected_before_any_writes(
     repository: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     contents: str,
 ) -> None:
@@ -234,8 +235,8 @@ def test_invalid_cmake_project_is_rejected_before_any_writes(
     run = Mock()
     monkeypatch.setattr(subprocess, "run", run)
     with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
-        modules["repository_metadata"].cmake_version(repository)
+        repository_metadata.cmake_version(repository)
     with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
-        modules["set_version"].update_version(repository, "2.0.0")
+        set_version.update_version(repository, "2.0.0")
     assert snapshot(repository) == before
     run.assert_not_called()

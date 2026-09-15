@@ -3,52 +3,21 @@
 import json
 import os
 import subprocess
-import sys
-from importlib import import_module
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
 
-
-@pytest.fixture
-def modules(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
-    monkeypatch.setattr("sys.argv", ["script.py"])
-    return {
-        name: import_module(
-            f"repo_tools.{name}"
-            if name in {"repository_metadata", "github_checks", "github_api"}
-            else f"repo_tools.commands.{name}"
-        )
-        for name in (
-            "check_python",
-            "check_coverage",
-            "repository_metadata",
-            "github_checks",
-            "check_versions",
-            "set_version",
-            "check_native_install",
-            "check_pr_title",
-            "check_commits",
-            "check_merge",
-            "check_release_readiness",
-            "check_github_settings",
-            "github_api",
-            "check_python_install",
-            "doctor",
-            "check_workspace",
-        )
-    }
+from repo_tools import github_checks
+from repo_tools.commands import check_merge, check_release_readiness
 
 
 @pytest.fixture
 def repository(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, modules: dict[str, ModuleType]
+    tmp_path: Path,
 ) -> Path:
-    for name in ("check_versions", "set_version", "check_native_install"):
-        monkeypatch.setattr(modules[name], "resolve_root", lambda root=None: tmp_path)
-
     (tmp_path / "version.txt").write_text("1.2.3\n", encoding="utf-8")
     (tmp_path / "CMakeLists.txt").write_text(
         "project(example VERSION 1.2.3 LANGUAGES C)\n", encoding="utf-8"
@@ -75,16 +44,50 @@ def repository(
 REPOSITORY = "owner/project"
 
 
+@pytest.fixture
+def git(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Callable[..., str]:
+    """Run Git without inherited identities, configuration, signing, hooks, or templates."""
+    for name in os.environ:
+        if name.startswith("GIT_"):
+            monkeypatch.delenv(name)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_TEMPLATE_DIR", str(tmp_path_factory.mktemp("empty-git-template")))
+
+    def run(*arguments: str) -> str:
+        return subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Repository tests",
+                "-c",
+                "user.email=tests@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "tag.gpgsign=false",
+                *arguments,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    return run
+
+
 @pytest.fixture(params=["squash", "merge", "rebase"])
 def merge_context(
-    modules: dict[str, ModuleType],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     request: pytest.FixtureRequest,
+    git: Callable[..., str],
 ) -> tuple[ModuleType, dict[str, Any]]:
-    module = modules["github_checks"]
-    cli = modules["check_merge"]
-    policy = module.load_policy()
+    module = github_checks
+    cli = check_merge
+    policy = module.load_policy(root=Path.cwd())
     policy_file = tmp_path / module.POLICY
     policy_file.parent.mkdir(parents=True)
     policy_file.write_text(json.dumps(policy), encoding="utf-8")
@@ -93,14 +96,7 @@ def merge_context(
         "[tool.uv.workspace]\nmembers = []\n", encoding="utf-8"
     )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
     monkeypatch.setenv("GITHUB_REPOSITORY", REPOSITORY)
-
-    def git(*arguments: str) -> str:
-        return subprocess.check_output(
-            ["git", *arguments], stderr=subprocess.DEVNULL, text=True
-        ).strip()
 
     git("init", "--initial-branch=main")
     git("config", "user.name", "Merge tests")
@@ -143,7 +139,9 @@ def merge_context(
     git("update-ref", "refs/heads/main", merge)
     required = {
         check["context"]
-        for check in module.load_policy()["protection"]["required_status_checks"]["checks"]
+        for check in module.load_policy(root=Path.cwd())["protection"]["required_status_checks"][
+            "checks"
+        ]
     } - {"Conventional PR title"}
     pr = {
         "number": 1,
@@ -165,7 +163,7 @@ def merge_context(
         "pull_requests": [],
     }
     state: dict[str, Any] = {
-        "cli": cli,
+        "arguments": ["check-merge", "--base", base, "--head", merge],
         "method": request.param,
         "base": base,
         "head": head,
@@ -209,18 +207,17 @@ def merge_context(
     monkeypatch.setattr(cli, "api", api)
     monkeypatch.setattr(module, "items", items)
     monkeypatch.setattr(module, "validation_record", lambda *args: state["evidence"])
-    monkeypatch.setattr(sys, "argv", ["check_merge.py", "--base", base, "--head", merge])
+
     return module, state
 
 
 @pytest.fixture
 def recovery_context(
     merge_context: tuple[ModuleType, dict[str, Any]],
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[ModuleType, dict[str, Any]]:
     merge, state = merge_context
-    release = modules["check_release_readiness"]
+    release = check_release_readiness
     state["runs"][0].update(
         event="workflow_dispatch",
         head_branch="main",

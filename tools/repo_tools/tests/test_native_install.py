@@ -1,14 +1,18 @@
 """Installed header and test-dependency validation."""
 
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
+from repo_tools import cli
+from repo_tools.commands import check_native_install
+
 
 @pytest.fixture
-def installation(tmp_path: Path, modules: dict[str, ModuleType]) -> Path:
-    checker = modules["check_native_install"]
+def installation(
+    tmp_path: Path,
+) -> Path:
+    checker = check_native_install
     for relative_path, prefix in checker.COMPONENTS.items():
         path = tmp_path / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -18,15 +22,18 @@ def installation(tmp_path: Path, modules: dict[str, ModuleType]) -> Path:
     return tmp_path
 
 
-def test_valid_installation(installation: Path, modules: dict[str, ModuleType]) -> None:
-    assert modules["check_native_install"].install_errors(installation, "1.2.3") == []
+def test_valid_installation(
+    installation: Path,
+) -> None:
+    assert check_native_install.install_errors(installation, "1.2.3") == []
 
 
 @pytest.mark.parametrize(
     "defect", ["missing_header", "missing_macro", "stale_string", "stale_number"]
 )
 def test_invalid_version_header(
-    defect: str, installation: Path, modules: dict[str, ModuleType]
+    defect: str,
+    installation: Path,
 ) -> None:
     header = installation / "include/example/core_version.h"
     if defect == "missing_header":
@@ -40,16 +47,18 @@ def test_invalid_version_header(
         else:
             contents = contents.replace("VERSION_PATCH 3", "VERSION_PATCH 2")
         header.write_text(contents, encoding="utf-8")
-    errors = modules["check_native_install"].install_errors(installation, "1.2.3")
+    errors = check_native_install.install_errors(installation, "1.2.3")
     assert len(errors) == 1
     assert "core_version.h" in errors[0]
 
 
-def test_cpputest_content_is_rejected(installation: Path, modules: dict[str, ModuleType]) -> None:
+def test_cpputest_content_is_rejected(
+    installation: Path,
+) -> None:
     library = installation / "lib/libCppUTest.a"
     library.parent.mkdir()
     library.touch()
-    errors = modules["check_native_install"].install_errors(installation, "1.2.3")
+    errors = check_native_install.install_errors(installation, "1.2.3")
     assert len(errors) == 1
     assert "test-only CppUTest content was installed" in errors[0]
 
@@ -58,14 +67,13 @@ def test_cpputest_content_is_rejected(installation: Path, modules: dict[str, Mod
 @pytest.mark.parametrize("defect", ["exit", "stdout", "stderr", "timeout", "execution"])
 def test_cli_failures(
     installation: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     argument: str,
     defect: str,
 ) -> None:
     import subprocess
 
-    checker = modules["check_native_install"]
+    checker = check_native_install
     executable = (
         installation / "bin" / ("package-a-cli.exe" if checker.os.name == "nt" else "package-a-cli")
     )
@@ -97,28 +105,24 @@ def test_cli_failures(
 
 def test_headers_without_executable_are_not_a_complete_installation(
     installation: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    import sys
 
-    checker = modules["check_native_install"]
-    monkeypatch.setattr(checker, "resolve_root", lambda root=None: installation)
+    (installation / "pyproject.toml").write_text("[tool.uv.workspace]\nmembers = []\n")
     (installation / "version.txt").write_text("1.2.3\n")
-    monkeypatch.setattr(sys, "argv", ["check_native_install.py", str(installation)])
-    assert checker.main() == 1
+    arguments = ["check-native-install", str(installation)]
+    assert cli.main(arguments, default_root=installation) == 1
     assert "missing installed executable" in capsys.readouterr().err
 
 
 def test_successful_installed_cli(
     installation: Path,
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import subprocess
 
-    checker = modules["check_native_install"]
+    checker = check_native_install
     executable = (
         installation / "bin" / ("package-a-cli.exe" if checker.os.name == "nt" else "package-a-cli")
     )

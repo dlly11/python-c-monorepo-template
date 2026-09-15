@@ -1,10 +1,13 @@
 """Rebased PRs retain individual subjects but reuse CI only for their final tree."""
 
 from copy import deepcopy
+from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import pytest
+
+from repo_tools import cli
 
 REPOSITORY = "owner/project"
 pytestmark = pytest.mark.parametrize("merge_context", ["rebase"], indirect=True)
@@ -25,7 +28,7 @@ def test_rewritten_shas_and_different_intermediate_tree_reuse_one_pr_run(
     assert git("rev-parse", f"{first}^{{tree}}") != state["tree"]
     assert module.verify_commit(REPOSITORY, final, state["required"], 42) == [first, final]
     capsys.readouterr()
-    assert state["cli"].main() == 0
+    assert cli.main(state["arguments"]) == 0
     assert capsys.readouterr().out.count("tested tree") == 1
 
 
@@ -45,7 +48,7 @@ def test_single_commit_rebase(
     state["runs"][0]["head_sha"] = original
     state["evidence"]["head_sha"] = original
     assert original != final
-    assert state["cli"].main(["--base", state["base"], "--head", final]) == 0
+    assert cli.main(["check-merge", "--base", state["base"], "--head", final]) == 0
 
 
 @pytest.mark.parametrize("boundary", ["start", "end"])
@@ -56,7 +59,7 @@ def test_push_cannot_split_a_rebased_pr(
     _module, state = merge_context
     base = state["integration"][0] if boundary == "start" else state["base"]
     head = state["integration"][0] if boundary == "end" else state["merge"]
-    assert state["cli"].main(["--base", base, "--head", head]) == 1
+    assert cli.main(["check-merge", "--base", base, "--head", head]) == 1
 
 
 @pytest.mark.parametrize("defect", ["missing", "ambiguous", "wrong_tip", "unmerged", "wrong_base"])
@@ -85,7 +88,7 @@ def test_incomplete_or_ambiguous_rebased_pr_associations_fail_closed(
         return original(endpoint, key)
 
     monkeypatch.setattr(module, "items", items)
-    assert state["cli"].main() == 1
+    assert cli.main(state["arguments"]) == 1
 
 
 @pytest.mark.parametrize("defect", ["subject", "parents"])
@@ -104,7 +107,14 @@ def test_recovery_validates_intermediate_rebased_commits(
     state["runs"][0]["head_sha"] = final
     state["evidence"].update(head_sha=final, checkout_sha=final)
     with pytest.raises(ValueError, match="rebased PR commit"):
-        module.ready("workflow_dispatch", state["event"], REPOSITORY, "refs/heads/main", final)
+        module.ready(
+            "workflow_dispatch",
+            state["event"],
+            REPOSITORY,
+            "refs/heads/main",
+            final,
+            root=Path.cwd(),
+        )
 
 
 def test_direct_commit_after_rebased_pr_is_rejected(
@@ -114,4 +124,4 @@ def test_direct_commit_after_rebased_pr_is_rejected(
     direct = state["git"](
         "commit-tree", state["tree"], "-p", state["merge"], "-m", "fix: direct push"
     )
-    assert state["cli"].main(["--base", state["base"], "--head", direct]) == 1
+    assert cli.main(["check-merge", "--base", state["base"], "--head", direct]) == 1

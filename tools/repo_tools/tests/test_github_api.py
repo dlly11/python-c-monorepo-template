@@ -1,15 +1,16 @@
 """Read-only GitHub transport and pagination regressions."""
 
 import subprocess
-from types import ModuleType
 
 import pytest
 
+from repo_tools import github_api
+
 
 def test_github_helper_only_uses_get_and_detects_repository(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    module = modules["github_api"]
+    module = github_api
     commands = []
 
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -32,10 +33,8 @@ def test_github_helper_only_uses_get_and_detects_repository(
         subprocess.CalledProcessError(1, "gh", stderr="HTTP 403"),
     ],
 )
-def test_github_errors_are_actionable(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch, error: Exception
-) -> None:
-    module = modules["github_api"]
+def test_github_errors_are_actionable(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    module = github_api
 
     def fail(*args: object, **kwargs: object) -> None:
         raise error
@@ -45,10 +44,8 @@ def test_github_errors_are_actionable(
         module.api("repos/owner/project")
 
 
-def test_collection_reads_every_page(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = modules["github_api"]
+def test_collection_reads_every_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = github_api
     monkeypatch.setattr(module, "gh", lambda *args: '[[{"id":1}],[{"id":2}]]')
     assert module.items("endpoint") == [{"id": 1}, {"id": 2}]
     monkeypatch.setattr(module, "gh", lambda *args: '[{"jobs":[{"id":1}]},{"jobs":[{"id":2}]}]')

@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
 from repo_tools.repository_metadata import (
     VERSION_PATTERN,
     cmake_project_version,
@@ -60,21 +59,24 @@ def update_version(root: Path, version: str) -> None:
         raise
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("version", help="new version in X.Y.Z form")
-    return parser
+def version_argument(value: str) -> str:
+    """Reject invalid versions through the active command parser."""
+    if VERSION_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError("version must use the numeric X.Y.Z form")
+    return value
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
+    parser.add_argument("version", type=version_argument, help="new version in X.Y.Z form")
+
+
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Update all committed version metadata."""
-    if VERSION_PATTERN.fullmatch(args.version) is None:
-        build_parser().error("version must use the numeric X.Y.Z form")
     if shutil.which("uv") is None:
-        build_parser().error("uv must be installed so uv.lock can be refreshed")
+        args.parser.error("uv must be installed so uv.lock can be refreshed")
     try:
-        update_version(resolve_root(root), args.version)
+        update_version(root, args.version)
     except KeyboardInterrupt:
         print("version update interrupted", file=sys.stderr)
         return 130
@@ -83,8 +85,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         return 1
     print(f"set all repository components to version {args.version}")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

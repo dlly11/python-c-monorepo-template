@@ -6,22 +6,18 @@ import argparse
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
 from repo_tools.repository_metadata import repository_version, version_errors
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument("--tag", help="also require this release tag to equal v<version>")
-    return parser
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Run the version consistency check."""
 
     try:
-        root = resolve_root(root)
         expected = repository_version(root)
         errors = version_errors(root, expected, args.tag)
     except (KeyError, OSError, TypeError, ValueError) as error:
@@ -35,8 +31,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
 
     print(f"all repository components use version {expected}")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)

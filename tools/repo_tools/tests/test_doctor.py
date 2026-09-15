@@ -1,9 +1,11 @@
 """Workstation diagnostics must be actionable and independent of the host tools."""
 
 import subprocess
-from types import ModuleType
 
 import pytest
+
+from repo_tools import cli
+from repo_tools.commands import doctor
 
 
 @pytest.mark.parametrize(
@@ -17,13 +19,12 @@ import pytest
     ],
 )
 def test_version_and_exit_checks(
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     output: str,
     status: int,
     expected: bool,
 ) -> None:
-    module = modules["doctor"]
+    module = doctor
     monkeypatch.setattr(module.shutil, "which", lambda _: "/tools/cmake")
     monkeypatch.setattr(
         module.subprocess,
@@ -35,8 +36,8 @@ def test_version_and_exit_checks(
     assert "/tools/cmake" in message
 
 
-def test_missing_tool(modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch) -> None:
-    module = modules["doctor"]
+def test_missing_tool(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = doctor
     monkeypatch.setattr(module.shutil, "which", lambda _: None)
     ok, message = module.probe(module.Tool("Ninja", ("ninja",)))
     assert not ok
@@ -46,10 +47,8 @@ def test_missing_tool(modules: dict[str, ModuleType], monkeypatch: pytest.Monkey
 @pytest.mark.parametrize(
     "error", [OSError("cannot execute"), subprocess.TimeoutExpired("tool", 10)]
 )
-def test_probe_errors(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch, error: Exception
-) -> None:
-    module = modules["doctor"]
+def test_probe_errors(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    module = doctor
     monkeypatch.setattr(module.shutil, "which", lambda _: "/tools/ninja")
 
     def fail(*args: object, **kwargs: object) -> None:
@@ -62,10 +61,8 @@ def test_probe_errors(
     assert str(error) in message
 
 
-def test_compiler_overrides_and_coverage_preset(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = modules["doctor"]
+def test_compiler_overrides_and_coverage_preset(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = doctor
     monkeypatch.setenv("CC", 'ccache "custom clang"')
     monkeypatch.setenv("CXX", "custom-clang++")
     monkeypatch.setattr(module.shutil, "which", lambda _: None)
@@ -78,10 +75,8 @@ def test_compiler_overrides_and_coverage_preset(
     assert coverage["g++"] == ("g++",)
 
 
-def test_compiler_path_with_spaces(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = modules["doctor"]
+def test_compiler_path_with_spaces(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = doctor
     path = r"C:\Program Files\LLVM\bin\clang.exe"
     monkeypatch.setenv("CC", path)
     monkeypatch.setattr(module.shutil, "which", lambda value: path if value == path else None)
@@ -91,43 +86,39 @@ def test_compiler_path_with_spaces(
 @pytest.mark.parametrize("system", ["Windows", "Darwin"])
 @pytest.mark.parametrize(("profile", "expected"), [("all", 0), ("coverage", 1)])
 def test_unsupported_coverage(
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     system: str,
     profile: str,
     expected: int,
 ) -> None:
-    module = modules["doctor"]
-    monkeypatch.setattr(module.sys, "argv", ["doctor.py", "--profile", profile])
+    module = doctor
+    arguments = ["doctor", "--profile", profile]
     monkeypatch.setattr(module.platform, "system", lambda: system)
     monkeypatch.setattr(module, "probe", lambda tool: (True, tool.name))
-    assert module.main() == expected
+    assert cli.main(arguments) == expected
     assert ("SKIP" if profile == "all" else "FAIL") in capsys.readouterr().out
     assert not any(tool.gcc for tool in module.profile_tools(profile))
 
 
 @pytest.mark.parametrize("compiler", ["", '"unterminated'])
 def test_all_missing_tools_are_reported(
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     compiler: str,
 ) -> None:
-    module = modules["doctor"]
-    monkeypatch.setattr(module.sys, "argv", ["doctor.py", "--profile", "analysis"])
+    module = doctor
+    arguments = ["doctor", "--profile", "analysis"]
     monkeypatch.setattr(module.shutil, "which", lambda _: None)
     monkeypatch.setenv("CC", compiler)
-    assert module.main() == 1
+    assert cli.main(arguments) == 1
     output = capsys.readouterr().out
     for name in ("CMake", "Ninja", "clang-format", "clang-tidy", "cppcheck"):
         assert f"FAIL {name}" in output
 
 
-def test_coverage_rejects_clang_named_gcc(
-    modules: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = modules["doctor"]
+def test_coverage_rejects_clang_named_gcc(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = doctor
     monkeypatch.setattr(module.shutil, "which", lambda _: "/tools/gcc")
     monkeypatch.setattr(
         module.subprocess,
@@ -140,13 +131,12 @@ def test_coverage_rejects_clang_named_gcc(
 
 
 def test_old_python_is_reported(
-    modules: dict[str, ModuleType],
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    module = modules["doctor"]
-    monkeypatch.setattr(module.sys, "argv", ["doctor.py", "--profile", "python"])
+    module = doctor
+    arguments = ["doctor", "--profile", "python"]
     monkeypatch.setattr(module.sys, "version_info", (3, 11))
     monkeypatch.setattr(module, "probe", lambda tool: (True, tool.name))
-    assert module.main() == 1
+    assert cli.main(arguments) == 1
     assert "FAIL Python" in capsys.readouterr().out

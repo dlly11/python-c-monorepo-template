@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repo_tools.context import resolve_root
 from repo_tools.repository_metadata import repository_version
 
 COMPONENTS = {
@@ -88,18 +87,16 @@ def cli_errors(prefix: Path, version: str) -> list[str]:
     return errors
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Describe command arguments without performing any work."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register command arguments without performing any work."""
     parser.add_argument("prefix", type=Path, help="native CMake installation prefix")
-    return parser
 
 
-def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
+def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Check one native installation prefix."""
 
     try:
-        version = repository_version(resolve_root(root))
+        version = repository_version(root)
         prefix = args.prefix.resolve()
         errors = install_errors(prefix, version) + cli_errors(prefix, version)
     except (OSError, ValueError) as error:
@@ -112,8 +109,3 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
 
     print(f"native install contains version {version}; installed CLI smoke checks passed")
     return 0
-
-
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
-    """Parse arguments and run the command."""
-    return execute(build_parser().parse_args(argv), root=root)
