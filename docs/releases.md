@@ -129,8 +129,18 @@ and choosing an artifact registry.
 
 ## Recovering expired CI evidence
 
-Use this procedure if the original PR validation artifact is unavailable and the original run can
-no longer be retried. GitHub permits reruns only within 30 days of a run's initial execution.
+If the original PR validation artifact is missing, first retry the original PR CI, including
+Python quality, then retry push CI. GitHub permits reruns only within
+[30 days of the initial execution](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+A partial rerun can reuse the quality job's record from the same run and immutable head.
+
+When the original run is unavailable or can no longer be retried, use the fresh-validation
+procedure below. Before merging a long-lived PR whose original run can no longer be retried,
+push a new Conventional Commit to obtain fresh PR validation.
+
+The release gate checks out full Git history. Local merged-PR verification also requires a full
+checkout: for a shallow clone, run `git fetch --unshallow` before checking the integration. A shallow
+history can hide preserved commits or truncate a rebased sequence and is rejected before PR reads.
 
 First dispatch the existing full CI suite on current main:
 
