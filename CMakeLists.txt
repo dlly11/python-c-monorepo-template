@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(
   monorepo_template
-  VERSION 0.4.1 # x-release-please-version
+  VERSION 0.4.2 # x-release-please-version
   DESCRIPTION "Production-oriented C component examples"
   LANGUAGES C
 )

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.1...v0.4.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* gate releases on CI and validate repository policy ([#11](https://github.com/dlly11/python-c-monorepo-template/issues/11)) ([97d05b2](https://github.com/dlly11/python-c-monorepo-template/commit/97d05b2c56209c53a15a85f61d72612be36dae8c))
+
 ## [0.4.1](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.0...v0.4.1) (2026-09-15)
 
 
