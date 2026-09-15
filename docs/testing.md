@@ -4,6 +4,34 @@ The repository runs tests at component boundaries and enforces coverage across p
 and native C source. Compatibility tests, static analysis, sanitizers, and coverage remain
 separate CI responsibilities so each failure identifies one kind of problem.
 
+## Python distribution checks
+
+The Python quality job builds wheels and source distributions, then checks every wheel in a separate
+temporary environment. Run the same check locally:
+
+```bash
+uv run python scripts/check_python_install.py
+```
+
+The script uses a fresh artifact directory and checks distribution names and versions before
+installing. Each environment receives only its target wheel and declared dependencies. Local wheel
+constraints ensure sibling dependencies come from this build without installing unrelated members.
+Third-party runtime dependencies use the installer's configured indexes; the current example has
+none. Build backends still need an available index or cache, as with `uv build`.
+For a private index, supply uv's index environment settings so both build and isolated install
+commands can access it; installs run outside the checkout and do not discover its uv configuration.
+
+Checks run outside the checkout with isolated Python imports and no inherited `PYTHONPATH` or user
+site-packages. They verify installed versions, module locations, `py.typed`, dependency consistency,
+public API examples, and the installed CLI's normal, custom-prefix, and invalid-input behavior.
+Failures report the package and command output and return a nonzero exit status. Temporary build
+artifacts and environments are removed on both success and failure.
+
+Add a `SMOKE_CHECKS` entry in the script when introducing a Python distribution. These checks cover
+the exercised install/API paths; the ordinary component tests remain responsible for deeper behavior.
+CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
+version test matrix. The release workflow continues to build the same distribution formats.
+
 ## Native unit tests
 
 CTest remains the native test orchestrator. The core, package A, and package B test executables use
@@ -21,8 +49,14 @@ empty input. Linux additionally checks that greeting and version output fail whe
 ## Repository script tests
 
 The normal `uv run pytest` command also discovers `scripts/tests`. These tests cover version
-validation, version-update rollback, native install validation, and PR-title syntax using temporary
-files and mocked uv invocations. They do not access the network or change committed metadata.
+validation, version-update rollback, native install validation, PR-title syntax, wheel isolation,
+workspace registration consistency, and workstation diagnostics. Temporary-workspace tests cover
+added/removed/renamed members, exclusions, duplicate names, namespace drift, and incorrect release
+entries. They use temporary files and mocked subprocesses where appropriate. The
+wheel-isolation regression installs tiny fixture wheels with uv in offline mode; it checks that an
+undeclared dependency fails even when its source is available on `PYTHONPATH`. That regression skips
+when uv is unavailable; normal development and CI runs provide uv.
+Script tests do not access the network or change committed metadata.
 Coverage thresholds continue to measure production packages rather than orchestration scripts.
 
 ## Coverage policy

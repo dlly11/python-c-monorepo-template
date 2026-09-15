@@ -12,7 +12,15 @@ def scripts(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1]))
     return {
         name: import_module(name)
-        for name in ("check_versions", "set_version", "check_native_install", "check_pr_title")
+        for name in (
+            "check_versions",
+            "set_version",
+            "check_native_install",
+            "check_pr_title",
+            "check_python_install",
+            "doctor",
+            "check_workspace",
+        )
     }
 
 

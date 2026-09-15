@@ -28,9 +28,10 @@ jobs:
       - run: uv sync --locked --all-packages
       - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
+      - run: uv run python scripts/check_workspace.py
       - run: uv run python scripts/check_python.py
       - run: uv run python scripts/check_versions.py
-      - run: uv build --all-packages
+      - run: uv run python scripts/check_python_install.py
 
   python-tests:
     name: Python ${{ matrix.python-version }}

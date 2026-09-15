@@ -72,7 +72,8 @@ C++ programs can link to the C implementation.
 2. Give the distribution and import package organization-unique names.
 3. Add the member to `[tool.uv.workspace].members` if it is outside the existing glob.
 4. Declare workspace dependencies normally and add their sources to `[tool.uv.sources]`.
-5. Add the project path to `scripts/check_python.py` for type checking.
+5. Add the project path to `scripts/check_python.py` for type checking. Its separate script check
+   automatically includes repository scripts and their tests.
 6. Register its path and distribution name in `PROJECT_FILES` in `scripts/check_versions.py`.
    The manual version setter uses the same list. Set the initial version to the value in `version.txt`.
 7. Add its `project.version` to the `extra-files` list in `tools/release-please/config.json` so
@@ -80,10 +81,25 @@ C++ programs can link to the C implementation.
 8. Add its import package to the root coverage `source` list and Ruff's `known-first-party` list.
 9. Create component-owned `docs` pages, link their index from `docs/index.md`, and update the
    component README with a usage example and its absolute published documentation URL.
-10. Run `uv lock`, then the Python quality, version, test, packaging, and documentation checks.
+10. Add the distribution and a public API example to `SMOKE_CHECKS` in
+    `scripts/check_python_install.py`, using the component's actual import namespace.
+11. Run `uv lock`, `uv run python scripts/check_workspace.py`, then the Python quality, version,
+    test, packaging, and documentation checks.
 
 These explicit lists are intentionally small. Update all of them when adding or renaming a
 component; workspace discovery alone does not register release, coverage, or documentation policy.
+
+The workspace checker compares the existing registrations against the root uv member/exclude globs.
+It reads each member's distribution name and top-level packages at `src/<namespace>/__init__.py`,
+then checks the version registry, type-check projects, smoke-check namespaces, coverage/Ruff names,
+and Release Please's Python version-update entries. Missing, stale, and duplicate registrations
+produce errors naming the affected configuration. Overlapping member globs are deduplicated, while
+excluded directories are ignored.
+
+The checker is read-only and uses the standard library. It runs in Python quality CI and the local
+workspace-consistency hook. This template uses regular src-layout packages; adopting namespace
+packages or another layout also requires updating discovery. Native registrations retain their
+existing CMake and install checks; documentation links are validated by the Sphinx build.
 
 ## Adding a native package
 

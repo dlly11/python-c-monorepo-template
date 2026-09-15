@@ -1,0 +1,5 @@
+# Default owner for all components and shared tooling.
+* @dlly11
+
+# Adopters: replace the default owner, then add component paths below when splitting
+# ownership. Later matching patterns take precedence over the default.
