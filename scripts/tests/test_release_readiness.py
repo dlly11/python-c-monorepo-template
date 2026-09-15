@@ -34,6 +34,9 @@ def release_context(
         "runs": [run],
         "head": SHA,
         "reads": [],
+        "jobs": [
+            {"name": "Merged PR verification", "status": "completed", "conclusion": "success"}
+        ],
     }
 
     def api(endpoint: str) -> dict[str, Any]:
@@ -50,6 +53,7 @@ def release_context(
         return next(run for run in state["runs"] if endpoint.endswith(f"/runs/{run['id']}"))
 
     monkeypatch.setattr(module, "api", api)
+    monkeypatch.setattr(module, "items", lambda *args: state["jobs"])
     return module, state
 
 
@@ -147,6 +151,19 @@ def test_missing_ci_and_manual_non_main_are_rejected(
         module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
     with pytest.raises(ValueError, match="main branch"):
         module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/topic", SHA)
+
+
+@pytest.mark.parametrize("conclusion", ["missing", "skipped", "failure"])
+def test_release_requires_actual_merge_verification(
+    release_context: tuple[ModuleType, dict[str, Any]], conclusion: str
+) -> None:
+    module, state = release_context
+    if conclusion == "missing":
+        state["jobs"] = []
+    else:
+        state["jobs"][0]["conclusion"] = conclusion
+    with pytest.raises(ValueError, match="Merged PR verification"):
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)
 
 
 @pytest.mark.parametrize("allowed", [True, False])

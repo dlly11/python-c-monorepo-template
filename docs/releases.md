@@ -71,7 +71,7 @@ calls `scripts/check_commits.py`; the **Python quality** CI job calls it for the
 | CI event | Commits checked |
 | --- | --- |
 | Pull request | PR head commits not reachable from the event's base SHA; excludes GitHub's synthetic merge |
-| Push to `main` | Commits introduced between the push's before and after SHAs |
+| Push to `main` | New squash commit subjects, validated by `Merged PR verification` |
 | Manual dispatch, including release PRs | Selected branch commits not reachable from `origin/main` |
 
 CI fetches full history for this job and fails if a required revision cannot be resolved. Existing
@@ -96,26 +96,30 @@ gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
 
 ## Automated release sequence
 
-The release workflow runs after successful **push CI on the current `main` commit**:
+The release workflow runs after successful **post-merge verification on the current `main` commit**:
 
 1. The release gate verifies the triggering repository, CI workflow, event, branch, and commit,
-   then checks the latest push CI run for that commit. Only a completed successful run authorizes
-   Release Please to read Conventional Commits and open or update one release pull request.
+   then checks the latest push CI run for that commit. Its `Merged PR verification` job must pass:
+   merged files must match the tested PR's recorded tree, every required PR CI job must have
+   succeeded, and final subjects/version metadata must be valid. The full quality suite is not
+   repeated after merging. Only then may Release Please open or update a release PR.
 2. The pull request updates `version.txt`, `CHANGELOG.md`, every Python project version, the CMake
    version, and the Release Please manifest.
 3. The workflow checks out the managed branch, regenerates `uv.lock`, commits it when changed, and
    explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting release commit. The
    title workflow receives the release PR number.
 4. A maintainer reviews and merges the release pull request after its required checks pass.
-5. After the release PR is merged and push CI succeeds, Release Please creates the `vX.Y.Z` tag and
+5. After the release PR is merged and post-merge verification succeeds, Release Please creates the `vX.Y.Z` tag and
    GitHub Release.
 6. The same workflow builds every Python wheel and source distribution, creates native install
-   archives for Linux, macOS, and Windows, verifies their generated version headers, and attaches
-   them to the GitHub Release.
+   archives for Linux, macOS, and Windows, smoke-tests the built wheels and native install trees,
+   verifies version metadata, and attaches them to the GitHub Release. These checks exercise the
+   actual release artifacts; unit-test matrices, coverage, linting, and sanitizers remain on PRs.
 
 Automatic release runs for superseded commits skip without calling Release Please. The gate
 rechecks `main` immediately before that call; automatic and manual runs share one concurrency
 group. A passing PR check or manually dispatched CI run does not substitute for push CI.
+The push run is now a lightweight verification of the PR results, not another full suite.
 
 To retry release preparation manually, select `main`:
 
@@ -146,6 +150,9 @@ repository created from this template before relying on enforcement or unattende
    source. Keep branches up to date before merging and disallow force pushes and branch deletion.
    Zero required approvals supports a solo maintainer while still requiring a PR and its checks;
    teams can add review requirements. Do not require the owner to approve their own PR.
+   `Coverage` includes the Python 3.12 tests; only Python 3.13 and 3.14 need separate required
+   compatibility checks. Remove the old **Python 3.12** requirement when adopting this split.
+   **Merged PR verification** runs after merging and must not be a required PR check.
 3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, disable merge
    commits and rebase merging, and select a squash commit default that uses the **pull request
    title** even for single-commit PRs (`squash_merge_commit_title: PR_TITLE`). Require linear

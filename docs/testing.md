@@ -4,6 +4,36 @@ The repository runs tests at component boundaries and enforces coverage across p
 and native C source. Compatibility tests, static analysis, sanitizers, and coverage remain
 separate CI responsibilities so each failure identifies one kind of problem.
 
+## PR and post-merge responsibilities
+
+The complete quality suite runs on PRs and manual CI dispatches, including Release Please's
+managed PR branches. Python 3.12 is tested by `Coverage`; compatibility jobs test Python 3.13 and
+3.14. There is no separate Python 3.12 compatibility job.
+
+Push CI on `main` runs only `Merged PR verification`. It checks each new squash commit's subject,
+finds its merged PR, verifies that the original head has a successful CI run with every required
+CI job completed successfully, and compares the merged Git tree with the recorded tested tree.
+Skipped checks are not accepted as passing. Version metadata is checked without installing tools
+or rebuilding packages. The other CI jobs appear skipped on push runs because they already ran
+on the PR.
+
+The Python quality job uploads a small `pr-validation` JSON record of the actual checkout and
+tree, tied to its repository, run ID, and original head SHA. This distinguishes the PR's synthetic
+merge commit from the eventual squash commit while verifying identical tracked contents. Normal
+PR runs and full manually dispatched release-branch runs both produce this record. It is validation
+metadata, not a distributable build artifact. Release distributions are built from their tag.
+
+The verifier reads records from the selected CI run only, fails on missing or expired evidence,
+and never executes downloaded content. GitHub's repository artifact retention applies. If evidence
+expires, rerun the original PR CI (including Python quality to regenerate the record), then retry
+the failed push CI run. A partial rerun can reuse the successful quality job's record from the
+same run and immutable head. API or permission failures block verification and releases.
+
+CI regressions cover changed squash SHAs with matching trees, content mismatches, wrong runs,
+missing/skipped jobs, release-bot manual dispatches, fork PRs, and unavailable artifacts. These
+tests run in the existing pytest suite. The post-merge job needs contents, actions, and pull-request
+read permissions. Documentation deployment continues to build and deploy independently.
+
 ## Python distribution checks
 
 The Python quality job builds wheels and source distributions, then checks every wheel in a separate
@@ -31,6 +61,11 @@ Add a `SMOKE_CHECKS` entry in the script when introducing a Python distribution.
 the exercised install/API paths; the ordinary component tests remain responsible for deeper behavior.
 CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
 version test matrix. The release workflow continues to build the same distribution formats.
+
+To smoke-test already-built release wheels without rebuilding them, run
+`uv run python scripts/check_python_install.py --dist dist`. Release CI uses this mode before
+uploading the exact wheels it checked. This validates the published artifacts while the full
+unit-test and analysis suite remains on PRs.
 
 ## Native unit tests
 
@@ -111,7 +146,8 @@ uv run --group coverage gcovr --config tools/coverage/gcovr.cfg \
 
 ## Continuous integration reports
 
-The `Coverage` job runs once on Linux with Python 3.12 and GCC. Python compatibility jobs use
+The `Coverage` job runs once on Linux with Python 3.12 and GCC and provides the Python 3.12 test
+result. Python 3.13 and 3.14 compatibility jobs use
 `--no-cov` because collecting identical data on every supported interpreter would not improve the
 gate. The coverage job writes its table to the GitHub Actions job summary and retains the complete
 report directory as the `coverage-reports` artifact for 14 days. Reports are uploaded even when a

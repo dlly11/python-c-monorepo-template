@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import shutil
@@ -168,8 +169,13 @@ def check_wheel(
         )
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Build once and check every wheel without using the workspace environment."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dist", type=Path, help="verify existing release wheels without rebuilding"
+    )
+    args = parser.parse_args(argv)
     context = "build"
     try:
         uv = shutil.which("uv")
@@ -184,13 +190,14 @@ def main() -> int:
             )
         with tempfile.TemporaryDirectory(prefix="python-install-check-") as directory:
             temporary = Path(directory).resolve()
-            dist = temporary / "dist"
-            print("Building all wheels and source distributions", flush=True)
-            run(
-                [uv, "build", "--all-packages", "--out-dir", str(dist)],
-                cwd=ROOT,
-                env=dict(os.environ),
-            )
+            dist = args.dist.resolve() if args.dist is not None else temporary / "dist"
+            if args.dist is None:
+                print("Building all wheels and source distributions", flush=True)
+                run(
+                    [uv, "build", "--all-packages", "--out-dir", str(dist)],
+                    cwd=ROOT,
+                    env=dict(os.environ),
+                )
             wheels = collect_wheels(dist, expected)
             constraints = temporary / "workspace-wheels.txt"
             constraints.write_text(
