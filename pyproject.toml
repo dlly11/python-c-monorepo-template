@@ -1,6 +1,6 @@
 [project]
 name = "python-c-monorepo-template"
-version = "0.4.5"
+version = "0.5.0"
 description = "Production-oriented template for Python and C projects in one monorepo."
 requires-python = ">=3.12"
 dependencies = []

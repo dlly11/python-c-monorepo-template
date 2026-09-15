@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.5...v0.5.0) (2026-09-15)
+
+
+### Features
+
+* **ci:** support GitHub merge commits alongside squash ([1c8e026](https://github.com/dlly11/python-c-monorepo-template/commit/1c8e026d5d204e4e95d8d3b3de4f1efcb095db3f))
+* **ci:** support GitHub merge commits alongside squash ([#20](https://github.com/dlly11/python-c-monorepo-template/issues/20)) ([25616d3](https://github.com/dlly11/python-c-monorepo-template/commit/25616d3b98cf079b3a50959db08a8033d9fcb801))
+
 ## [0.4.5](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.4...v0.4.5) (2026-09-15)
 
 
