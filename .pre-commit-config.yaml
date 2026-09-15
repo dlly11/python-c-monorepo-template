@@ -33,11 +33,18 @@ repos:
         files: ^(version\.txt|uv\.lock|CMakeLists\.txt|pyproject\.toml|python/.*/pyproject\.toml)$
 
       - id: ty
-        name: ty (all Python workspace members)
+        name: ty (Python workspace members and repository scripts)
         entry: uv run python scripts/check_python.py
         language: system
         pass_filenames: false
         types: [python]
+
+      - id: workspace-consistency
+        name: Python workspace registration consistency
+        entry: uv run python scripts/check_workspace.py
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|python/.*|scripts/.*\.py|tools/release-please/config\.json)$
 
       - id: clang-format
         name: clang-format check

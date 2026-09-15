@@ -10,6 +10,7 @@ members = [
     "example-package-b",
     "python-c-monorepo-template",
 ]
+build-constraints = [{ name = "setuptools", specifier = "==84.0.0" }]
 
 [[package]]
 name = "accessible-pygments"

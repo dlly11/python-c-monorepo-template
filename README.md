@@ -46,11 +46,12 @@ The root is an orchestration layer, not a deployable product. Every directory be
 owned component with its own public API and tests.
 
 See [the architecture guide](docs/architecture.md) for package boundaries and dependency rules.
+Start with the [workstation setup guide](docs/workstation.md) for Linux, macOS, or Windows.
 
 ## Prerequisites
 
 - Python 3.12 or newer
-- uv
+- uv 0.10.9 or newer
 - CMake 3.25 or newer
 - Ninja
 - A C17 compiler: GCC or Clang (MSVC options are provided but are not verified in CI)
@@ -63,22 +64,34 @@ The compiler and native analysis tools are intentionally system dependencies. In
 through the organization's approved workstation image, package mirror, or development container
 keeps Python dependency resolution separate from the native toolchain.
 
+Check your existing tools with `python scripts/doctor.py --profile all`. Use `--profile python`
+for Python-only work; see [diagnostic profiles](docs/workstation.md#understanding-doctor-output)
+for other workflows.
+
 ## Python workflow
 
 ```bash
 uv sync --locked --all-packages
 uv run ruff check .
 uv run ruff format --check .
+uv run python scripts/check_workspace.py
 uv run python scripts/check_python.py
 uv run pytest
+uv run python scripts/check_python_install.py
 uv run package-a-cli "Ada Lovelace"
 ```
 
-`ty` runs once per workspace member. This preserves package boundaries and avoids accidentally
-treating the entire monorepo as one import root.
+`ty` runs once per workspace member, then checks repository scripts and their tests using root
+configuration. This preserves package boundaries and avoids accidentally treating the entire
+monorepo as one import root. The workspace checker verifies that component registrations for type
+checking, coverage, smoke checks, and releases match the actual packages.
 
 Workspace dependencies are declared as normal distribution dependencies in member
 `pyproject.toml` files and resolved locally through `[tool.uv.sources]` at the repository root.
+The install check builds all distributions, then exercises each wheel in its own clean environment.
+See [dependency management](docs/dependencies.md) for tool versions, upgrades, and conflicting
+dependency requirements.
+The root uv configuration pins setuptools for both editable installations and distribution builds.
 
 ## Native workflow
 
@@ -195,16 +208,28 @@ repository settings, and the exceptional manual version command.
 
 ## Template adoption checklist
 
+Follow the [adoption and renaming guide](docs/adopting.md) for the naming table, shared registrations,
+initial version setup, and validation commands.
+
 Before using this template for a production repository:
 
 1. Replace the `example-*` distribution names and `example_*` import packages.
 2. Replace example components with organization-owned domains and assign CODEOWNERS.
-3. Select a license or mark the repository as proprietary according to company policy.
+3. Choose and document licensing terms for your derived project using the permission below.
 4. Pin approved compiler and analysis-tool versions in the corporate build image.
 5. Configure an internal Python index and native dependency source if required.
 6. Add artifact signing, SBOM, vulnerability scanning, and provenance policies expected by the
    organization, then configure trusted publishing for the chosen artifact registry.
 7. Protect `main` and require the Python, native, analysis, and sanitizer CI jobs.
+
+## Reuse permission
+
+You may use, copy, modify, distribute, and relicense the template's files, including for commercial
+or proprietary projects. You are free to change the licensing of any template file. This permission
+does not transfer ownership of the original
+[python-c-monorepo-template repository](https://github.com/dlly11/python-c-monorepo-template);
+do not claim ownership of that original template repository. Third-party dependencies retain their
+own licensing terms.
 
 ## Why C is separate from Python packaging
 

@@ -1,4 +1,4 @@
-"""Run ty once per Python workspace member to preserve package boundaries."""
+"""Type-check workspace members separately, then repository scripts and their tests."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ PROJECTS = (
 
 
 def main() -> None:
-    """Type-check every independently deliverable Python project."""
+    """Type-check each deliverable and the repository orchestration code."""
     for project in PROJECTS:
         relative_project = project.relative_to(ROOT)
         print(f"==> ty check {relative_project}", flush=True)
@@ -24,6 +24,12 @@ def main() -> None:
             cwd=ROOT,
             check=True,
         )
+    print("==> ty check scripts (including script tests)", flush=True)
+    subprocess.run(
+        ["ty", "check", "--project", str(ROOT), str(ROOT / "scripts")],
+        cwd=ROOT,
+        check=True,
+    )
 
 
 if __name__ == "__main__":

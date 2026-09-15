@@ -11,6 +11,9 @@ testing, versioning, and release automation can be compared without coupling the
 :caption: Repository guides
 
 architecture
+workstation
+adopting
+dependencies
 testing
 native-quality
 releases
