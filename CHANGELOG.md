@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.2...v1.0.3) (2026-09-15)
+
+
+### Bug Fixes
+
+* **tools:** support offline coverage and centralize smoke checks ([889011b](https://github.com/dlly11/python-c-monorepo-template/commit/889011bf0a92a82123bb162d0493fe8b889bee43))
+
 ## [1.0.2](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.1...v1.0.2) (2026-09-15)
 
 
