@@ -72,29 +72,21 @@ C++ programs can link to the C implementation.
 2. Give the distribution and import package organization-unique names.
 3. Add the member to `[tool.uv.workspace].members` if it is outside the existing glob.
 4. Declare workspace dependencies normally and add their sources to `[tool.uv.sources]`.
-5. Add the project path to `scripts/check_python.py` for type checking. Its separate script check
-   automatically includes repository scripts and their tests.
-6. Register its path and distribution name in `PROJECT_FILES` in `scripts/check_versions.py`.
-   The manual version setter uses the same list. Set the initial version to the value in `version.txt`.
-7. Add its `project.version` to the `extra-files` list in `tools/release-please/config.json` so
-   automated releases update it too.
-8. Add its import package to the root coverage `source` list and Ruff's `known-first-party` list.
-9. Create component-owned `docs` pages, link their index from `docs/index.md`, and update the
-   component README with a usage example and its absolute published documentation URL.
-10. Add the distribution and a public API example to `SMOKE_CHECKS` in
-    `scripts/check_python_install.py`, using the component's actual import namespace.
-11. Run `uv lock`, `uv run python scripts/check_workspace.py`, then the Python quality, version,
-    test, packaging, and documentation checks.
+5. Set its version to `version.txt`. Type checks, version checks, and the setter discover members
+   from the workspace; no script project lists need updating.
+6. Register `project.version` in Release Please's `extra-files` and add the import package to
+   coverage's `source` list and Ruff's `known-first-party` list in the root `pyproject.toml`.
+7. Add a public API smoke example to `SMOKE_CHECKS` in `scripts/python_smoke_checks.py`.
+8. Create `docs/index.md` with overview, examples, and API reference; link it from `docs/index.md`.
+   Retain a distribution README with a short usage example and absolute documentation URL.
+9. Run `uv lock`, `uv run python scripts/check_workspace.py`, and the relevant
+   [local checks](testing.md#local-validation).
 
-These explicit lists are intentionally small. Update all of them when adding or renaming a
-component; workspace discovery alone does not register release, coverage, or documentation policy.
-
-The workspace checker compares the existing registrations against the root uv member/exclude globs.
-It reads each member's distribution name and top-level packages at `src/<namespace>/__init__.py`,
-then checks the version registry, type-check projects, smoke-check namespaces, coverage/Ruff names,
-and Release Please's Python version-update entries. Missing, stale, and duplicate registrations
-produce errors naming the affected configuration. Overlapping member globs are deduplicated, while
-excluded directories are ignored.
+The workspace checker expands uv member/exclude globs and discovers distribution names and regular
+packages at `src/<namespace>/__init__.py`. It verifies smoke namespaces, coverage/Ruff names, and
+Release Please's version entries, reporting missing, stale, or duplicate registrations. Overlapping
+globs are deduplicated and excluded directories ignored. These remaining registrations describe
+policy or examples that cannot be inferred from membership alone.
 
 The checker is read-only and uses the standard library. It runs in Python quality CI and the local
 workspace-consistency hook. This template uses regular src-layout packages; adopting namespace

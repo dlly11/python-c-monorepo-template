@@ -39,13 +39,13 @@ def workflow_title(
     return pr["title"]
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Validate a standalone title, or a live PR tied to the workflow's head commit."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("title", nargs="?")
     parser.add_argument("--pr", type=int)
     parser.add_argument("--expected-head")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         title = args.title
         if args.pr is not None:

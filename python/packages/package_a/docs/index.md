@@ -7,9 +7,30 @@ on package B or either application.
 from example_package_a import GreetingService
 ```
 
-```{toctree}
-:maxdepth: 1
+## Python package A examples
 
-examples
-api
+### Default greeting
+
+```python
+from example_package_a import GreetingService
+
+message = GreetingService().greet("Ada")
+assert message.text == "Hello, Ada!"
+assert message.source == "package_a"
+```
+
+### Custom prefix
+
+```python
+from example_package_a import GreetingService
+
+message = GreetingService(prefix="Welcome").greet("Grace Hopper")
+assert message.text == "Welcome, Grace Hopper!"
+```
+
+## Python package A API
+
+```{automodule} example_package_a.service
+:members:
+:show-inheritance:
 ```

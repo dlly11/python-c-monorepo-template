@@ -36,9 +36,9 @@ symbols beginning with `acme_`. Keep the component dependency directions describ
 | Naming family | Current examples | Places to update |
 | --- | --- | --- |
 | Product and repository | `python-c-monorepo-template`, `Python and C Monorepo Template` | Root metadata, README, docs, Sphinx title/author, Release Please package name |
-| Distribution names | `example-core`, `example-package-a`, `example-package-b`, `example-package-a-cli` | Member metadata, dependency declarations, root uv sources, version-check registry, wheel smoke registry |
+| Distribution names | `example-core`, `example-package-a`, `example-package-b`, `example-package-a-cli` | Member metadata, dependency declarations, root uv sources, wheel smoke registry |
 | Python import namespaces | `example_core`, `example_package_a`, `example_package_b`, `example_package_a_cli` | `src` directories, imports, tests, entry points, setuptools package data, Ruff first-party names, coverage sources, autodoc/examples |
-| Component directories | `core`, `package_a`, `package_b`, `package_a_cli` | Both language trees, CMake subdirectories, script project lists, release extra-files, documentation toctrees |
+| Component directories | `core`, `package_a`, `package_b`, `package_a_cli` | Both language trees, CMake subdirectories, release extra-files, documentation toctrees |
 | C symbols, macros, and include paths | `example_*`, `EXAMPLE_*`, `example/` | Headers, sources, guards, version-header templates, tests, Doxygen/examples, native install checker |
 | CMake project and package | `monorepo_template`, `MonorepoTemplate`, `example::core` | Root/component CMake, `cmake` config templates and export namespaces, install destinations, downstream consumer, docs |
 | Executable names | `package-a-cli` | Python entry point and installed CLI checks; native target/output name, CTest, examples, artifact checks |
@@ -56,8 +56,7 @@ The shared registrations are intentionally explicit. Review these when renaming,
 a component:
 
 - Root `pyproject.toml`: workspace membership/sources, Ruff import names, and coverage sources.
-- `scripts/check_versions.py`: `PROJECT_FILES`; `scripts/check_python.py`: `PROJECTS`.
-- `scripts/check_python_install.py`: `SMOKE_CHECKS` and any installed CLI checks. Add one meaningful
+- `scripts/python_smoke_checks.py`: `SMOKE_CHECKS`; `scripts/check_python_install.py`: CLI checks. Add one meaningful
   public API example for every independently shipped Python package.
 - `scripts/check_native_install.py`: installed version-header paths and macro prefixes.
 - Root/component CMake files and `native/tests/install_consumer`: targets, exports, installed
@@ -116,30 +115,10 @@ Review matches rather than deleting them blindly: original-template credit, adop
 historical release notes can intentionally retain old names. Also search for your old component
 directory names if you changed them.
 
-Run the same package and native validation used by contributors:
+Run the [local validation checklist](testing.md#local-validation) and
+[installed native consumer](architecture.md#consuming-a-native-installation). Inspect the rendered
+documentation and installed CLI output for old product names. Replace the template reporting
+address in [SECURITY.md](SECURITY.md) with your own monitored private channel.
 
-```text
-uv run python scripts/doctor.py --profile native
-uv run ruff check .
-uv run ruff format --check .
-uv run python scripts/check_workspace.py
-uv run python scripts/check_python.py
-uv run python scripts/check_versions.py
-uv run pytest
-uv run python scripts/check_python_install.py
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
-cmake --install build/dev --prefix build/dev/stage
-uv run python scripts/check_native_install.py build/dev/stage
-cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DMONOREPO_INSTALL_PREFIX="${PWD}/build/dev/stage"
-cmake --build build/install-consumer
-ctest --test-dir build/install-consumer --output-on-failure
-uv sync --locked --all-packages --group docs
-uv run --group docs python scripts/build_docs.py
-```
-
-Run the commands from the repository root: `${PWD}` expands to that absolute path in Bash, Zsh, and
-PowerShell. The consumer configure command therefore searches the installation just created.
-Run analysis and Linux coverage using the [contribution guide](CONTRIBUTING.md), then inspect the
-rendered documentation and installed CLI output for old product names.
+For adding components without renaming the template, use the
+[architecture guide](architecture.md#adding-a-python-package).

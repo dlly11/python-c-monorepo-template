@@ -124,8 +124,10 @@ def test_release_mode_checks_supplied_wheels_without_rebuilding(
 ) -> None:
     module = scripts["check_python_install"]
     wheel = write_wheel(tmp_path, "example-core")
-    monkeypatch.setattr(module, "PROJECT_FILES", {Path("core/pyproject.toml"): "example-core"})
-    monkeypatch.setattr(module, "project_metadata", lambda path: ("example-core", "1.2.3"))
+    monkeypatch.setattr(
+        module, "python_projects", lambda root: {Path("core/pyproject.toml"): "example-core"}
+    )
+    monkeypatch.setattr(module, "project_metadata", lambda root, path: ("example-core", "1.2.3"))
     monkeypatch.setattr(module, "SMOKE_CHECKS", {"example-core": ("example_core", "")})
     monkeypatch.setattr(module.shutil, "which", lambda _: "uv")
 
@@ -135,7 +137,13 @@ def test_release_mode_checks_supplied_wheels_without_rebuilding(
     checked = []
 
     def check(
-        uv: str, name: str, version: str, artifact: Path, constraints: Path, temporary: Path
+        uv: str,
+        name: str,
+        version: str,
+        artifact: Path,
+        constraints: Path,
+        temporary: Path,
+        project_root: Path,
     ) -> None:
         checked.append(artifact)
         assert artifact == wheel
@@ -146,3 +154,57 @@ def test_release_mode_checks_supplied_wheels_without_rebuilding(
     assert module.main(["--dist", str(tmp_path)]) == 0
     assert checked == [wheel]
     assert wheel.exists()
+
+
+def test_install_discovers_selected_project_configuration(
+    tmp_path: Path, scripts: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv is needed for the offline installation regression")
+    module = scripts["check_python_install"]
+    project = tmp_path / "project"
+    artifacts = tmp_path / "private-wheels"
+    temporary = tmp_path / "isolated"
+    for path in (project, artifacts, temporary):
+        path.mkdir()
+    write_wheel(artifacts, "private-dependency", code='message = "Private"\n')
+    wheel = write_wheel(
+        artifacts,
+        "example-core",
+        requires="Requires-Dist: private-dependency==1.2.3\n",
+        code="from private_dependency import message\n",
+    )
+    # Only this checkout's config knows where to find the private dependency.
+    (project / "pyproject.toml").write_text(
+        f'[tool.uv]\nno-index = true\nfind-links = ["{artifacts.as_uri()}"]\n', encoding="utf-8"
+    )
+    constraints = temporary / "constraints.txt"
+    constraints.touch()
+    monkeypatch.setitem(
+        module.SMOKE_CHECKS,
+        "example-core",
+        ("example_core", 'from example_core import message\nassert message == "Private"'),
+    )
+    for variable in ("UV_NO_CONFIG", "UV_FIND_LINKS", "UV_CONFIG_FILE"):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("UV_OFFLINE", "1")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
+    module.check_wheel(uv, "example-core", "1.2.3", wheel, constraints, temporary, project)
+
+
+def test_hanging_smoke_command_times_out_with_output(
+    tmp_path: Path, scripts: dict[str, ModuleType]
+) -> None:
+    with pytest.raises(RuntimeError, match=r"timed out.*started"):
+        scripts["check_python_install"].run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                'import time; print("started", flush=True); time.sleep(30)',
+            ],
+            cwd=tmp_path,
+            env=dict(os.environ),
+            timeout=1,
+        )

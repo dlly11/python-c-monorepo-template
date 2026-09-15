@@ -3,6 +3,8 @@
 #include "example/core.h"
 #include "example/core_version.h"
 
+extern "C" const char *example_test_unknown_status_string(void);
+
 TEST_GROUP(CoreFormatMessage){};
 
 TEST(CoreFormatMessage, FormatsMessage) {
@@ -75,25 +77,11 @@ TEST(CoreFormatMessage, RejectsInvalidArguments) {
 TEST_GROUP(CoreStatusString){};
 
 TEST(CoreStatusString, DescribesEveryStatus) {
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wconversion"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-#endif
-    const auto unknown_status = static_cast<example_status>(99);
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
     STRCMP_EQUAL("ok", example_core_status_string(EXAMPLE_STATUS_OK));
     STRCMP_EQUAL("invalid argument", example_core_status_string(EXAMPLE_STATUS_INVALID_ARGUMENT));
     STRCMP_EQUAL("buffer too small", example_core_status_string(EXAMPLE_STATUS_BUFFER_TOO_SMALL));
     STRCMP_EQUAL("format error", example_core_status_string(EXAMPLE_STATUS_FORMAT_ERROR));
-    STRCMP_EQUAL("unknown status", example_core_status_string(unknown_status));
+    STRCMP_EQUAL("unknown status", example_test_unknown_status_string());
 }
 
 TEST_GROUP(CoreVersion){};

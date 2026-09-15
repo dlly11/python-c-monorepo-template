@@ -4,11 +4,46 @@ The repository runs tests at component boundaries and enforces coverage across p
 and native C source. Compatibility tests, static analysis, sanitizers, and coverage remain
 separate CI responsibilities so each failure identifies one kind of problem.
 
+## Local validation
+
+Run from the repository root after [workstation setup](workstation.md). This full checklist assumes
+Linux/GCC. Coverage runs the Python and native tests; a separate pytest invocation is unnecessary.
+
+```bash
+uv run pre-commit run --all-files
+uv sync --locked --all-packages --group coverage --group docs
+uv run --no-sync python scripts/check_versions.py
+uv run --no-sync python scripts/check_python_install.py
+uv run --no-sync python scripts/check_coverage.py
+uv run --no-sync python scripts/build_docs.py
+cmake --preset analysis
+cmake --build --preset analysis
+cmake --build --preset analysis --target format-c-check
+cmake --preset asan
+cmake --build --preset asan
+ctest --preset asan
+```
+
+On macOS or Windows, replace the coverage command with `uv run pytest --no-cov` and the `dev`
+configure/build/CTest presets. The sanitizer preset is unavailable on Windows. For native changes,
+also exercise the [installed consumer](architecture.md#consuming-a-native-installation).
+
+For a focused Python change, use `uv run pytest --no-cov PATH_TO_TESTS` during development. Build
+documentation with `uv run --group docs python scripts/build_docs.py` and open
+`build/docs/html/index.html`; Sphinx and Doxygen warnings fail the build.
+
 ## PR and post-merge responsibilities
 
-The complete quality suite runs on PRs and manual CI dispatches, including Release Please's
-managed PR branches. Python 3.12 is tested by `Coverage`; compatibility jobs test Python 3.13 and
-3.14. There is no separate Python 3.12 compatibility job.
+| Event | Quality work | Commit subjects | Release eligibility |
+| --- | --- | --- | --- |
+| Pull request | Full suite and separate title check | PR head commits outside the event's base SHA | Tested evidence for the later merge |
+| Manual CI | Full suite on selected branch | Commits outside `origin/main` (none on main) | Explicit recovery only on current main |
+| Ordinary main push | Merged PR verification and version check | New squash commits | Latest successful verified push on current main |
+| Initial branch creation (zero previous SHA) | Full suite; no validation record | Inherited history is the baseline and is skipped | Never |
+
+Python 3.12 runs in **Coverage**; compatibility jobs cover 3.13 and 3.14. Required check names live
+in `tools/github/repository-policy.json`. Pages builds/deploys independently on main. Release builds
+and smoke-tests tagged artifacts without repeating the PR test and analysis suite.
 
 Push CI on `main` runs only `Merged PR verification`. It checks each new squash commit's subject,
 finds its merged PR, verifies that the original head has a successful CI run with every required
@@ -36,12 +71,6 @@ suite on the exact merged commit. Missing evidence never counts as success, and 
 historical push run is not rewritten as passing. Before merging a long-lived PR, push a new
 Conventional Commit to obtain fresh PR validation if the original run can no longer be retried.
 
-An initial branch-creation push (an all-zero previous SHA) runs the full quality suite. Its inherited
-history is the baseline, so commit-subject checks and PR validation records do not apply to that
-initialization event. Merged PR verification is skipped, and automatic release preparation reports
-that no verified merge exists. Subsequent pushes must pass the ordinary merge gate. See the
-[adoption guide](adopting.md) for the first protected PR.
-
 CI regressions cover changed squash SHAs with matching trees, content mismatches, wrong runs,
 missing/skipped jobs, release-bot manual dispatches, fork PRs, and unavailable artifacts. These
 tests run in the existing pytest suite. The post-merge job needs contents, actions, and pull-request
@@ -61,23 +90,26 @@ installing. Each environment receives only its target wheel and declared depende
 constraints ensure sibling dependencies come from this build without installing unrelated members.
 Third-party runtime dependencies use the installer's configured indexes; the current example has
 none. Build backends still need an available index or cache, as with `uv build`.
-For a private index, supply uv's index environment settings so both build and isolated install
-commands can access it; installs run outside the checkout and do not discover its uv configuration.
+Installation runs from the selected project root so uv discovers its index configuration. Pass
+credentials through uv's supported environment settings; the wheel environment is still explicitly
+selected and separate from the workspace.
 
 Checks run outside the checkout with isolated Python imports and no inherited `PYTHONPATH` or user
 site-packages. They verify installed versions, module locations, `py.typed`, dependency consistency,
 public API examples, and the installed CLI's normal, custom-prefix, and invalid-input behavior.
+API/CLI checks time out after ten seconds; uv build/install commands after five minutes.
 Failures report the package and command output and return a nonzero exit status. Temporary build
 artifacts and environments are removed on both success and failure.
 
-Add a `SMOKE_CHECKS` entry in the script when introducing a Python distribution. These checks cover
+Add a `SMOKE_CHECKS` entry in `scripts/python_smoke_checks.py` when introducing a Python distribution. These checks cover
 the exercised install/API paths; the ordinary component tests remain responsible for deeper behavior.
 CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
 version test matrix. The release workflow continues to build the same distribution formats.
 
 To smoke-test already-built release wheels without rebuilding them, run
 `uv run python scripts/check_python_install.py --dist dist`. Release CI uses this mode before
-uploading the exact wheels it checked. This validates the published artifacts while the full
+uploading the exact wheels it checked. Use `--project-root CHECKOUT` to select version metadata
+and build/index configuration from another checkout; see [asset recovery](releases.md#recovering-missing-release-assets). This validates the published artifacts while the full
 unit-test and analysis suite remains on PRs.
 
 ## Native unit tests

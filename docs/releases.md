@@ -35,7 +35,8 @@ uv run python scripts/set_version.py 1.2.3
 ```
 
 Normal releases must go through Release Please. The manual command does not create release notes,
-a tag, or a GitHub Release.
+a tag, or a GitHub Release. It validates declarations before writing and restores original bytes
+after errors or Ctrl+C; this is rollback, not a filesystem-wide atomic transaction.
 
 Dependency lower bounds such as `example-core>=0.1.0` are compatibility statements rather than
 the current release number. Increase one only when a component starts using an API unavailable in
@@ -54,41 +55,13 @@ validated PR title into the commit subject on `main`.
 | `feat(core)!: replace the result API` | Major (`1.2.3` to `2.0.0`) |
 | `docs: explain local builds` | Included in history but does not initiate a release |
 
-The subject format is `type(scope)!: description`, with the scope and `!` optional. Supported
-types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and
-`test`. Types and scopes are lowercase; scopes start with a letter or digit and may contain
-letters, digits, `.`, `_`, `/`, and `-`. Descriptions must be nonempty, stay on one line, and have
-no leading/trailing whitespace or control characters. This is the repository's chosen subset of
-[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+Use the [contribution guide](CONTRIBUTING.md#commit-messages-and-pull-requests) for subject syntax,
+hook setup, and repair commands. CI event behavior and checked commit ranges are documented once
+in [testing](testing.md#pr-and-post-merge-responsibilities). Bootstrap pushes skip inherited subjects.
 
-For breaking changes, put `!` in the PR title and explain the migration in a `BREAKING CHANGE:`
-footer in the final squash commit body. Commit bodies and footers are not linted. The subject
-marker preserves the release signal even if the squash body is edited.
-
-`scripts/conventional_commits.py` holds the shared subject policy. The local `commit-msg` hook
-calls `scripts/check_commits.py`; the **Python quality** CI job calls it for these ranges:
-
-| CI event | Commits checked |
-| --- | --- |
-| Pull request | PR head commits not reachable from the event's base SHA; excludes GitHub's synthetic merge |
-| Push to `main` | New squash commit subjects, validated by `Merged PR verification` |
-| Manual dispatch, including release PRs | Selected branch commits not reachable from `origin/main` |
-
-CI fetches full history for this job and fails if a required revision cannot be resolved. Existing
-history is not rewritten or revalidated by ordinary PR/push checks. A branch-creation push with an
-all-zero before SHA checks the whole introduced history, including the root commit. A manual run
-on `main` has no new commits to check. All commits within the selected range must conform,
-including merge commits; default merge/revert messages and temporary `fixup!` subjects do not pass.
-See [Contributing](CONTRIBUTING.md) for hook installation and message repair commands.
-
-The separate `PR title` workflow runs the **Conventional PR title** check on PR creation, reopening,
-new commits, and edits. It reads the current title, so fixing a title also fixes its check without
-rerunning the build matrix. The main CI workflow continues to run for code changes.
-
-For a manual title check, select the open PR's current head branch in this repository and supply
-its number. The check fails if the PR's head repository, branch, or commit does not match the run;
-a run queued before the branch advances must be dispatched again. Normal PR events support forks
-and compare the PR's actual head commit, excluding GitHub's synthetic merge:
+For breaking changes, put `!` in the PR title and explain migration in a `BREAKING CHANGE:` footer
+in the final squash body. Bodies and footers are not linted. For a manual title check, select the
+open PR's current head branch and number:
 
 ```bash
 gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
@@ -120,7 +93,6 @@ Automatic release runs for superseded commits skip without calling Release Pleas
 rechecks `main` immediately before that call; automatic and manual runs share one concurrency
 group. A passing PR check or ordinary manual CI run does not automatically substitute for push CI.
 The explicit recovery procedure below can authorize a release from fresh manual main validation.
-The push run is now a lightweight verification of the PR results, not another full suite.
 
 To retry release preparation manually, select `main`:
 
@@ -184,7 +156,7 @@ repository created from this template before relying on enforcement or unattende
    Zero required approvals supports a solo maintainer while still requiring a PR and its checks;
    teams can add review requirements. Do not require the owner to approve their own PR.
    `Coverage` includes the Python 3.12 tests; only Python 3.13 and 3.14 need separate required
-   compatibility checks. Remove the old **Python 3.12** requirement when adopting this split.
+   compatibility checks.
    **Merged PR verification** runs after merging and must not be a required PR check.
 3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, disable merge
    commits and rebase merging, and select a squash commit default that uses the **pull request
@@ -250,14 +222,20 @@ Release Please no longer reports that release as newly created, and the asset jo
 on that output. Rerunning a successful upload uses `--clobber` to replace its existing asset.
 
 If the original job can no longer be retried, rebuild from the exact release tag in a clean
-worktree, using the matching platform and compiler. The examples below use Bash and an already
+worktree, using the matching platform and compiler. This procedure supports v0.4.2 onward. Earlier
+tags need a separately reviewed historical procedure. Keep current, validated tooling in its own
+checkout: old tagged checkers may ignore newer options or lack installation checks.
+
+The examples below use Bash and an already
 authenticated GitHub CLI with release-write access:
 
 ```bash
-RELEASE_TAG=v1.2.3  # Replace with the existing release tag.
+TOOLING_ROOT=$(git rev-parse --show-toplevel)  # Current checkout with the updated checkers.
+RELEASE_TAG=v0.4.2  # Replace with the existing release tag.
 git fetch origin tag "${RELEASE_TAG}"
 git worktree add --detach ../release-recovery "${RELEASE_TAG}"
-cd ../release-recovery
+RELEASE_ROOT=$(cd ../release-recovery && pwd)
+cd "${RELEASE_ROOT}"
 python scripts/check_versions.py --tag "${RELEASE_TAG}"
 ```
 
@@ -265,9 +243,9 @@ For a missing Python distribution:
 
 ```bash
 uv build --all-packages --out-dir dist
-python scripts/check_python_install.py --dist dist
+python "${TOOLING_ROOT}/scripts/check_python_install.py" --project-root "${RELEASE_ROOT}" --dist "${RELEASE_ROOT}/dist"
 # Only after every wheel passes; upload only the missing/rebuilt asset; replace this example filename as needed.
-gh release upload "${RELEASE_TAG}" dist/example_core-1.2.3-py3-none-any.whl --clobber
+gh release upload "${RELEASE_TAG}" dist/example_core-0.4.2-py3-none-any.whl --clobber
 ```
 
 For a missing native archive, use GCC/G++ on Linux, Clang/Clang++ on macOS, or GCC/G++ from
@@ -284,8 +262,8 @@ ARCHIVE="${REPOSITORY_NAME}-${RELEASE_TAG}-${RELEASE_OS}-${RELEASE_ARCH}.zip"
 cmake --preset release
 cmake --build --preset release
 cmake --install build/release --prefix stage
-python scripts/check_native_install.py stage
-cmake -S native/tests/install_consumer -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${PWD}/stage"
+python "${TOOLING_ROOT}/scripts/check_native_install.py" --project-root "${RELEASE_ROOT}" "${RELEASE_ROOT}/stage"
+cmake -S "${TOOLING_ROOT}/native/tests/install_consumer" -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${PWD}/stage"
 cmake --build build/release-consumer
 ctest --test-dir build/release-consumer --output-on-failure
 cmake -E make_directory dist

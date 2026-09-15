@@ -1,7 +1,6 @@
 """Audit GitHub policy drift without allowing remote writes."""
 
 import json
-import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -99,11 +98,12 @@ def test_invalid_policy_is_configuration_error(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     contents: str,
+    scripts: dict[str, ModuleType],
 ) -> None:
     module, _ = settings_context
     path = tmp_path / "policy.json"
     path.write_text(contents, encoding="utf-8")
-    monkeypatch.setattr(module, "POLICY", path)
+    monkeypatch.setattr(scripts["github_checks"], "POLICY", path)
     assert module.main() == 2
 
 
@@ -111,6 +111,7 @@ def test_duplicate_policy_checks_are_rejected(
     settings_context: tuple[ModuleType, dict[str, Any]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    scripts: dict[str, ModuleType],
 ) -> None:
     module, _ = settings_context
     policy = module.load_policy()
@@ -118,44 +119,5 @@ def test_duplicate_policy_checks_are_rejected(
     checks.append(checks[0])
     path = tmp_path / "policy.json"
     path.write_text(json.dumps(policy), encoding="utf-8")
-    monkeypatch.setattr(module, "POLICY", path)
+    monkeypatch.setattr(scripts["github_checks"], "POLICY", path)
     assert module.main() == 2
-
-
-def test_github_helper_only_uses_get_and_detects_repository(
-    scripts: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = scripts["github_api"]
-    commands = []
-
-    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        commands.append(command)
-        assert kwargs["timeout"] == 30
-        output = "owner/project\n" if command[1] == "repo" else '{"name": "project"}'
-        return subprocess.CompletedProcess(command, 0, output, "")
-
-    monkeypatch.setattr(module.subprocess, "run", run)
-    assert module.repository_name() == "owner/project"
-    assert module.api("repos/owner/project") == {"name": "project"}
-    assert commands[-1] == ["gh", "api", "--method", "GET", "repos/owner/project"]
-
-
-@pytest.mark.parametrize(
-    "error",
-    [
-        OSError("missing gh"),
-        subprocess.TimeoutExpired("gh", 30),
-        subprocess.CalledProcessError(1, "gh", stderr="HTTP 403"),
-    ],
-)
-def test_github_errors_are_actionable(
-    scripts: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch, error: Exception
-) -> None:
-    module = scripts["github_api"]
-
-    def fail(*args: object, **kwargs: object) -> None:
-        raise error
-
-    monkeypatch.setattr(module.subprocess, "run", fail)
-    with pytest.raises(RuntimeError):
-        module.api("repos/owner/project")

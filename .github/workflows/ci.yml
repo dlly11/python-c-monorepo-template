@@ -26,7 +26,7 @@ jobs:
       actions: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -40,13 +40,13 @@ jobs:
 
   python-quality:
     name: Python quality
-    if: >-
+    if: &run-quality >-
       github.event_name != 'push' ||
       (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -56,7 +56,7 @@ jobs:
           COMMIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || format('origin/{0}', github.event.repository.default_branch) }}
           COMMIT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python scripts/check_commits.py --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
       - run: uv sync --locked --all-packages
@@ -70,7 +70,7 @@ jobs:
       - name: Record tested PR contents
         if: github.event_name != 'push'
         run: python scripts/check_merge.py --record build/pr-validation/validation.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: github.event_name != 'push'
         with:
           name: pr-validation
@@ -80,9 +80,7 @@ jobs:
 
   python-tests:
     name: Python ${{ matrix.python-version }}
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    if: *run-quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -90,10 +88,10 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -102,16 +100,14 @@ jobs:
 
   coverage:
     name: Coverage
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    if: *run-quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           python-version: "3.12"
@@ -122,7 +118,7 @@ jobs:
         run: cat build/coverage/reports/summary.md >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-reports
           path: build/coverage/reports
@@ -130,17 +126,15 @@ jobs:
           retention-days: 14
 
   documentation:
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    if: *run-quality
     name: Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
       - name: Install Doxygen
@@ -150,9 +144,10 @@ jobs:
 
   native-build:
     name: Native build (${{ matrix.os }})
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    defaults:
+      run:
+        shell: bash
+    if: *run-quality
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -173,7 +168,7 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - run: cmake --preset dev
@@ -199,13 +194,11 @@ jobs:
 
   native-analysis:
     name: Native static analysis
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    if: *run-quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install native analysis tools
@@ -213,17 +206,14 @@ jobs:
       - run: cmake --preset analysis
       - run: cmake --build --preset analysis
       - run: cmake --build --preset analysis --target format-c-check
-      - run: ctest --preset analysis
 
   sanitizers:
     name: Native sanitizers
-    if: >-
-      github.event_name != 'push' ||
-      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
+    if: *run-quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - run: cmake --preset asan

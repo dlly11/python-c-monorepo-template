@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import shutil
 import subprocess
 import sys
@@ -11,8 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD_ROOT = ROOT / "build/docs"
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Generate Doxygen XML and build warning-free Sphinx HTML."""
+    argparse.ArgumentParser(description=__doc__).parse_args(argv)
     required_tools = ("cmake", "doxygen", "ninja")
     tools = {tool: shutil.which(tool) for tool in required_tools}
     missing_tools = [tool for tool, path in tools.items() if path is None]

@@ -39,7 +39,7 @@ jobs:
       tag-name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Check out release gate from main
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           fetch-depth: 2
@@ -71,7 +71,7 @@ jobs:
 
       - name: Check out the release pull request
         if: steps.release.outputs.prs_created == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ steps.release-pr.outputs.branch }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: Install uv
         if: steps.release.outputs.prs_created == 'true'
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
 
@@ -121,11 +121,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           ref: ${{ needs.release-please.outputs.tag-name }}
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Verify the release version
         env:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
@@ -170,7 +170,7 @@ jobs:
       CXX: ${{ matrix.cxx }}
       RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           ref: ${{ needs.release-please.outputs.tag-name }}

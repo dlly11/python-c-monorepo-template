@@ -30,8 +30,12 @@ install(
 )
 
 if(BUILD_TESTING)
+  add_library(example_core_c_test_helpers OBJECT tests/unknown_status.c)
+  target_link_libraries(example_core_c_test_helpers PRIVATE example::core)
+  monorepo_set_project_options(example_core_c_test_helpers)
+
   add_executable(example_core_tests tests/test_core.cpp)
-  target_link_libraries(example_core_tests PRIVATE example::core example_cpputest_main)
+  target_link_libraries(example_core_tests PRIVATE example::core example_cpputest_main example_core_c_test_helpers)
   monorepo_set_cpp_test_options(example_core_tests)
   monorepo_set_version_test_definitions(example_core_tests)
   add_test(NAME c.core COMMAND example_core_tests)

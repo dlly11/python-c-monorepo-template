@@ -9,7 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+from repository_metadata import ROOT, repository_version
+
 COMPONENTS = {
     Path("include/example/core_version.h"): "EXAMPLE_CORE",
     Path("include/example/package_a_version.h"): "EXAMPLE_PACKAGE_A",
@@ -86,15 +87,25 @@ def cli_errors(prefix: Path, version: str) -> list[str]:
     return errors
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Check one native installation prefix."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("prefix", type=Path, help="native CMake installation prefix")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=ROOT,
+        help="checkout containing the expected release version",
+    )
+    args = parser.parse_args(argv)
 
-    version = (ROOT / "version.txt").read_text(encoding="utf-8").strip()
-    prefix = args.prefix.resolve()
-    errors = install_errors(prefix, version) + cli_errors(prefix, version)
+    try:
+        version = repository_version(args.project_root.resolve())
+        prefix = args.prefix.resolve()
+        errors = install_errors(prefix, version) + cli_errors(prefix, version)
+    except (OSError, ValueError) as error:
+        print(f"native install check failed: {error}", file=sys.stderr)
+        return 1
     if errors:
         for error in errors:
             print(f"native install check failed: {error}", file=sys.stderr)

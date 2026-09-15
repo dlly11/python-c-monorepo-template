@@ -29,7 +29,7 @@ suppressed because those headers are owned by the selected compiler toolchain.
 | Workflow | Intended use | Static analysis |
 | --- | --- | --- |
 | `dev` | Normal local builds | Available separately; not required |
-| `analysis` | Pull requests and release qualification | clang-tidy and cppcheck required |
+| `analysis` | Production compilation without tests | clang-tidy and cppcheck required |
 | `asan` | Runtime defect detection | AddressSanitizer and UndefinedBehaviorSanitizer |
 | `coverage` | Native test effectiveness | GCC/gcov line and branch coverage |
 | `release` | Optimized artifacts | Tests and analysis performed in earlier stages |
@@ -49,5 +49,16 @@ keeps the dependency outside the default install/export set. CppUMock and the ex
 are intentionally disabled until a component has a concrete mocking requirement.
 
 For an approved internal copy, set `FETCHCONTENT_SOURCE_DIR_CPPUTEST` to its extracted source
-directory. Combine that override with `FETCHCONTENT_FULLY_DISCONNECTED=ON` for offline builds.
+directory:
+
+```bash
+cmake --preset dev -DFETCHCONTENT_SOURCE_DIR_CPPUTEST=/approved/sources/cpputest \
+  -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+```
+
+Disconnected configuration fails before downloading if no valid local source override or existing
+`CppUTest::CppUTest` target is supplied. The `analysis` and `release` presets disable tests and do
+not fetch CppUTest. Analysis compiles production targets with clang-tidy/cppcheck; `format-c-check`
+still checks all first-party C/C++ files. Unit tests run in the native matrix, coverage, and
+sanitizer builds.
 Static analysis and coverage target first-party sources rather than downloaded dependency code.

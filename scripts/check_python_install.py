@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -13,63 +12,8 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-from check_versions import PROJECT_FILES, ROOT, project_metadata
-
-# Keep one observable API example per independently delivered component.
-SMOKE_CHECKS = {
-    "example-core": (
-        "example_core",
-        """
-from example_core import Message, MessageKind, create_message, normalize_name
-assert normalize_name(" Ada  Lovelace ") == "Ada Lovelace"
-assert create_message(kind=MessageKind.GREETING, source="smoke", prefix="Hi", name="Ada") == (
-    Message(kind=MessageKind.GREETING, source="smoke", text="Hi, Ada!")
-)
-""",
-    ),
-    "example-package-a": (
-        "example_package_a",
-        """
-from example_package_a import GreetingService
-message = GreetingService().greet("Ada")
-assert (message.kind, message.source, message.text) == ("greeting", "package_a", "Hello, Ada!")
-""",
-    ),
-    "example-package-b": (
-        "example_package_b",
-        """
-from example_package_b import FarewellService
-message = FarewellService().farewell("Ada")
-assert (message.kind, message.source, message.text) == ("farewell", "package_b", "Goodbye, Ada!")
-""",
-    ),
-    "example-package-a-cli": (
-        "example_package_a_cli",
-        """
-from example_package_a_cli.cli import build_parser
-assert build_parser().parse_args(["Ada"]).name == "Ada"
-""",
-    ),
-}
-
-INSTALL_CHECK = """
-import importlib
-import importlib.metadata
-import pathlib
-import sys
-
-name, namespace, expected_version = sys.argv[1:]
-assert importlib.metadata.version(name) == expected_version
-module = importlib.import_module(namespace)
-location = pathlib.Path(module.__file__).resolve()
-assert location.is_relative_to(pathlib.Path(sys.prefix).resolve()), location
-assert location.with_name("py.typed").is_file(), "missing py.typed"
-"""
-
-
-def normalized_name(name: str) -> str:
-    """Normalize a distribution name for comparisons with wheel metadata."""
-    return re.sub(r"[-_.]+", "-", name).lower()
+from python_smoke_checks import INSTALL_CHECK, SMOKE_CHECKS
+from repository_metadata import ROOT, normalized_name, project_metadata, python_projects
 
 
 def collect_wheels(directory: Path, expected: dict[str, str]) -> dict[str, Path]:
@@ -104,9 +48,18 @@ def run(
     status: int = 0,
     stdout: str | None = None,
     stderr_contains: str | None = None,
+    timeout: int = 300,
 ) -> None:
     """Run a command and include its output in any failure report."""
-    result = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(
+            command, cwd=cwd, env=env, capture_output=True, text=True, check=False, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            f"command {subprocess.list2cmdline(command)} timed out after {timeout}s; "
+            f"stdout: {error.stdout!r}; stderr: {error.stderr!r}"
+        ) from error
     if (
         result.returncode != status
         or (stdout is not None and result.stdout != stdout)
@@ -121,7 +74,13 @@ def run(
 
 
 def check_wheel(
-    uv: str, name: str, version: str, wheel: Path, constraints: Path, temporary: Path
+    uv: str,
+    name: str,
+    version: str,
+    wheel: Path,
+    constraints: Path,
+    temporary: Path,
+    project_root: Path = ROOT,
 ) -> None:
     """Install only this wheel and its declared dependencies, then exercise it."""
     env = dict(os.environ)
@@ -138,7 +97,7 @@ def check_wheel(
     python = str(bin_directory / ("python.exe" if os.name == "nt" else "python"))
     run(
         [uv, "pip", "install", "--python", python, "-c", str(constraints), str(wheel)],
-        cwd=temporary,
+        cwd=project_root,
         env=env,
     )
     run([uv, "pip", "check", "--python", python], cwd=temporary, env=env)
@@ -147,17 +106,19 @@ def check_wheel(
         [python, "-I", "-c", INSTALL_CHECK + example, name, namespace, version],
         cwd=temporary,
         env=env,
+        timeout=10,
     )
     if name == "example-package-a-cli":
         executable = str(
             bin_directory / ("package-a-cli.exe" if os.name == "nt" else "package-a-cli")
         )
-        run([executable, "Ada"], cwd=temporary, env=env, stdout="Hello, Ada!\n")
+        run([executable, "Ada"], cwd=temporary, env=env, stdout="Hello, Ada!\n", timeout=10)
         run(
             [executable, "Ada", "--prefix", "Welcome"],
             cwd=temporary,
             env=env,
             stdout="Welcome, Ada!\n",
+            timeout=10,
         )
         run(
             [executable, "   "],
@@ -166,6 +127,7 @@ def check_wheel(
             status=2,
             stdout="",
             stderr_contains="name must contain at least one non-whitespace character",
+            timeout=10,
         )
 
 
@@ -175,14 +137,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dist", type=Path, help="verify existing release wheels without rebuilding"
     )
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=ROOT,
+        help="checkout to build/validate (default: tooling checkout)",
+    )
     args = parser.parse_args(argv)
+    project_root = args.project_root.resolve()
     context = "build"
     try:
         uv = shutil.which("uv")
         if uv is None:
             raise ValueError("uv is required; see docs/workstation.md")
         expected = dict(
-            project_metadata(path) for path in PROJECT_FILES if path != Path("pyproject.toml")
+            project_metadata(project_root, path)
+            for path in python_projects(project_root)
+            if path != Path("pyproject.toml")
         )
         if expected.keys() != SMOKE_CHECKS.keys():
             raise ValueError(
@@ -195,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("Building all wheels and source distributions", flush=True)
                 run(
                     [uv, "build", "--all-packages", "--out-dir", str(dist)],
-                    cwd=ROOT,
+                    cwd=project_root,
                     env=dict(os.environ),
                 )
             wheels = collect_wheels(dist, expected)
@@ -207,8 +178,8 @@ def main(argv: list[str] | None = None) -> int:
             for name, wheel in wheels.items():
                 context = name
                 print(f"Checking installed {name}=={expected[name]}", flush=True)
-                check_wheel(uv, name, expected[name], wheel, constraints, temporary)
-    except (OSError, ValueError, RuntimeError, BadZipFile) as error:
+                check_wheel(uv, name, expected[name], wheel, constraints, temporary, project_root)
+    except (OSError, KeyError, TypeError, ValueError, RuntimeError, BadZipFile) as error:
         print(f"Python install check failed ({context}): {error}", file=sys.stderr)
         return 1
     print("All Python wheels passed isolated installation checks")

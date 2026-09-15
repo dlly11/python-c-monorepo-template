@@ -101,11 +101,11 @@ def probe(tool: Tool) -> tuple[bool, str]:
     return True, description
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Report all prerequisites for the selected workflow and a summary status."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="all")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     failures = 0
 
     def report(ok: bool, message: str) -> None:

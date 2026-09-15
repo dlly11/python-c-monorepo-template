@@ -33,7 +33,8 @@ versions. Resolve that by:
 1. Reading the resolver's dependency chain and finding compatible tool releases or valid ranges.
 2. Upgrading or replacing the conflicting tool and validating the workflows it affects.
 3. If the tool is an independent CLI, running it in an isolated uv tool environment with an explicit
-   version. For example, `uv tool run --from 'ruff==0.16.7' ruff --version` illustrates that mechanism;
+   version. For example, `uv tool run --from "ruff==${RUFF_VERSION}" ruff --version` illustrates that mechanism
+   after setting `RUFF_VERSION` to your chosen approved version;
    the repository's normal Ruff command remains `uv run ruff`.
 4. If applications themselves require incompatible runtime libraries, moving the conflicting
    application into a separate project outside workspace membership, with its own environment and
@@ -51,7 +52,7 @@ incompatible resolution with overrides or manually installing conflicting packag
   already depends on the same library.
 - Put shared Python development tools in the appropriate root dependency group.
 - Put build-backend requirements in the component's `[build-system].requires`.
-- Keep native/system tools outside Python dependencies; record their setup and validated versions
+- Keep native/system tools outside Python dependencies; record their setup requirements
   in the [workstation guide](workstation.md).
 
 Build backends such as setuptools run in isolated build environments. Their requirements are not
@@ -61,7 +62,7 @@ workspace source mappings. See [uv's distribution build guidance](https://docs.a
 
 ## Repository build backend
 
-The root `[tool.uv]` sets `build-constraint-dependencies = ["setuptools==84.0.0"]`. This separate
+The root `[tool.uv].build-constraint-dependencies` declares the setuptools pin. This separate
 constraint pins the backend for editable installations through `uv sync`/`uv run`, local wheel
 checks, and release builds. Each member retains `setuptools>=77` in its build requirements;
 consumers rebuilding an individual source distribution do not inherit the root constraint.
@@ -98,7 +99,7 @@ uv tree --group docs --invert --package sphinx
 
 For a new sibling dependency, add its distribution name to the consuming member's dependencies and
 ensure the root has a matching `{ workspace = true }` source entry, then run `uv lock`.
-New components also need the shared registrations listed in the [adoption guide](adopting.md).
+New components also need the registrations listed in the [architecture guide](architecture.md#adding-a-python-package).
 Commit the declaration changes and regenerated `uv.lock` together. Never hand-edit the lockfile.
 The commands follow [uv's dependency management interface](https://docs.astral.sh/uv/concepts/projects/dependencies/).
 
@@ -139,3 +140,7 @@ repository style. Weekly schedules and update groups are configured in `.github/
 The actionlint version has one source: its official hook revision in the pre-commit configuration.
 Python quality invokes that exact hook, and Dependabot's existing pre-commit updates cover upgrades.
 After upgrading, run `uv run pre-commit run actionlint --all-files` and review any new diagnostics.
+
+GitHub Actions are pinned to full upstream commit SHAs with version comments. Dependabot's existing
+GitHub Actions group proposes updates. Review both the commit and its upstream release when
+updating a pin; keep the comment aligned. No extra CI job is needed for this policy.
