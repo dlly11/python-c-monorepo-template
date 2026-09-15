@@ -56,13 +56,21 @@ After rewriting an already pushed branch, coordinate with anyone using it and pu
 
 The **Python quality** CI check validates the commits introduced by a PR even if local hooks were
 skipped. The separate **Conventional PR title** check reruns on title edits without rerunning the
-build matrix. Merge with **Squash and merge** or **Create a merge commit**, keeping the validated
-PR title as the resulting commit subject. Squash produces one commit; a merge commit also preserves
-the branch's individual commits. Rebase merging is disabled. Both methods reuse the PR's successful
-CI by verifying that the final merged contents match what was tested.
+build matrix. GitHub supports three merge methods here:
+
+| Method | Commits added to main |
+| --- | --- |
+| **Squash and merge** | One commit using the validated PR title |
+| **Create a merge commit** | The original branch commits plus a merge commit using the validated PR title |
+| **Rebase and merge** | Individual commits with their original messages and new SHAs |
+
+Keep the validated title when confirming a squash or merge commit. Rebase does not create a
+commit from the PR title or description. All methods reuse the PR's successful CI by verifying
+that the final integrated contents match what was tested.
 
 Put `!` in the PR title for breaking changes and in the relevant individual commit when preserving
-commits. See [release behavior](releases.md#conventional-commits) for version and changelog effects.
+commits. For a rebase, a breaking marker only in the PR title will not reach the commit history.
+See [release behavior](releases.md#conventional-commits) for version and changelog effects.
 
 Manual title workflow runs must select the open PR's current head branch in this repository and
 its matching PR number. The workflow verifies the head repository, branch, and commit before
