@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.0...v1.0.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **ci:** require complete history for release recovery ([6b67452](https://github.com/dlly11/python-c-monorepo-template/commit/6b67452d27a5a1f23df33b8106db79c3928d870b))
+
 ## [1.0.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.6.0...v1.0.0) (2026-09-15)
 
 
