@@ -197,7 +197,9 @@ The full compilation-database-aware clang-tidy analysis remains in the CMake ana
 
 Full quality checks run on PRs, including release PRs. After merging, one small CI job verifies
 that the merged files match the tested PR, checks the final commit subject, and checks version
-metadata. Python 3.12 tests run in the coverage job; separate compatibility jobs cover 3.13 and
+metadata. Initialization pushes run the full suite without authorizing release. Explicit release recovery can
+use fresh manual CI on current main; see [release recovery](docs/releases.md).
+Python 3.12 tests run in the coverage job; separate compatibility jobs cover 3.13 and
 3.14. Release automation waits for this post-merge verification and builds/smoke-tests the actual
 release artifacts without repeating the full test suite. To audit the
 repository's merge and branch-protection settings against the checked-in policy, run

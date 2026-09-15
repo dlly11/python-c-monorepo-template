@@ -24,6 +24,12 @@ repos:
     hooks:
       - id: uv-lock
 
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        args: [-shellcheck=, -pyflakes=]
+
   - repo: local
     hooks:
       - id: conventional-commit

@@ -197,3 +197,13 @@ def test_step_output_records_decision(
     monkeypatch.setattr(module, "ready", fail)
     assert module.main() == 1
     assert not output_path.exists()
+
+
+def test_initialization_never_authorizes_release(
+    release_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = release_context
+    state["jobs"][0]["conclusion"] = "skipped"
+    assert not module.ready("workflow_run", state["event"], REPOSITORY, "refs/heads/main", SHA)
+    with pytest.raises(ValueError, match="Merged PR verification"):
+        module.ready("workflow_dispatch", {}, REPOSITORY, "refs/heads/main", SHA)

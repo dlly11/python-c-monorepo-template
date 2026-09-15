@@ -11,6 +11,7 @@ Before opening a pull request, run:
 
 ```bash
 uv sync --locked --all-packages
+uv run pre-commit run actionlint --all-files
 uv run ruff check .
 uv run ruff format --check .
 uv run python scripts/check_workspace.py

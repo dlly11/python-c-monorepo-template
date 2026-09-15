@@ -12,6 +12,20 @@ own licensing terms.
 This is the template's plain-language reuse permission. No standard license or SPDX identifier is
 selected for your derived project; choose and document the terms appropriate to your own project.
 
+## Initialize CI and the first protected PR
+
+Create the repository from the template and enable Actions. If GitHub emits an initial
+branch-creation push, CI runs the full quality suite against the inherited baseline and skips
+merged-PR verification. The release workflow skips preparation because there is no verified merge.
+If no initialization run was created, manually dispatch `ci.yml` on main to validate the baseline;
+that run also does not authorize a release.
+
+Configure branch protection and squash merging using the [release guide](releases.md), then make
+renaming, version, and setup changes on a feature branch. Open a PR and let its full CI and title
+checks pass before merging. This first protected squash merge establishes ordinary post-merge
+verification and release automation. Do not bypass the PR requirement to commit setup changes
+directly to main. An initial commit's inherited subject is not retroactively rewritten.
+
 ## 1. Decide the new names
 
 Create your repository from the template, then choose distribution, import, C API, and product names
@@ -118,7 +132,7 @@ cmake --build --preset dev
 ctest --preset dev
 cmake --install build/dev --prefix build/dev/stage
 uv run python scripts/check_native_install.py build/dev/stage
-cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DCMAKE_PREFIX_PATH="${PWD}/build/dev/stage"
+cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DMONOREPO_INSTALL_PREFIX="${PWD}/build/dev/stage"
 cmake --build build/install-consumer
 ctest --test-dir build/install-consumer --output-on-failure
 uv sync --locked --all-packages --group docs

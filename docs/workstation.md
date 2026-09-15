@@ -175,3 +175,14 @@ Use `uv sync --locked` with the appropriate group to install Python tools, then 
 The root uv configuration pins setuptools to 84.0.0 for editable installs and distribution builds.
 You do not need to install setuptools globally. See the [backend upgrade procedure](dependencies.md)
 when deliberately changing that pin.
+
+## GitHub workflow editing
+
+Run `uv run pre-commit run actionlint --all-files` before submitting workflow changes. The official
+hook is pinned to actionlint v1.7.12 and uses pre-commit's managed Go environment. First use downloads
+and builds the tool and may take longer; subsequent local runs reuse that environment. Allow access
+to GitHub and Go toolchain/module downloads when initializing it. Go is a hook build dependency,
+not a Python workspace dependency or a requirement for ordinary Python execution.
+
+The system-tool doctor does not inspect pre-commit's private environments. Run the hook itself to
+validate its installation. ShellCheck and Pyflakes integration are disabled in this hook.

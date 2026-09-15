@@ -24,10 +24,23 @@ PR runs and full manually dispatched release-branch runs both produce this recor
 metadata, not a distributable build artifact. Release distributions are built from their tag.
 
 The verifier reads records from the selected CI run only, fails on missing or expired evidence,
-and never executes downloaded content. GitHub's repository artifact retention applies. If evidence
-expires, rerun the original PR CI (including Python quality to regenerate the record), then retry
-the failed push CI run. A partial rerun can reuse the successful quality job's record from the
-same run and immutable head. API or permission failures block verification and releases.
+and never executes downloaded content. GitHub's repository artifact retention applies. Original
+runs can be retried only within [30 days of their initial run](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+Within that window, rerun the original PR CI including Python quality, then retry push CI. A partial
+rerun can reuse the quality job's record from the same run and immutable head.
+
+After that window, or when the original run is unavailable, use the explicit
+[release evidence recovery procedure](releases.md): run fresh manual
+CI on current main, then supply its run ID to a manual Release dispatch. This exercises the full
+suite on the exact merged commit. Missing evidence never counts as success, and the failed
+historical push run is not rewritten as passing. Before merging a long-lived PR, push a new
+Conventional Commit to obtain fresh PR validation if the original run can no longer be retried.
+
+An initial branch-creation push (an all-zero previous SHA) runs the full quality suite. Its inherited
+history is the baseline, so commit-subject checks and PR validation records do not apply to that
+initialization event. Merged PR verification is skipped, and automatic release preparation reports
+that no verified merge exists. Subsequent pushes must pass the ordinary merge gate. See the
+[adoption guide](adopting.md) for the first protected PR.
 
 CI regressions cover changed squash SHAs with matching trees, content mismatches, wrong runs,
 missing/skipped jobs, release-bot manual dispatches, fork PRs, and unavailable artifacts. These
@@ -152,3 +165,22 @@ result. Python 3.13 and 3.14 compatibility jobs use
 gate. The coverage job writes its table to the GitHub Actions job summary and retains the complete
 report directory as the `coverage-reports` artifact for 14 days. Reports are uploaded even when a
 test or threshold fails, when enough data was generated to create them.
+
+## Native release smoke checks
+
+`python scripts/check_native_install.py PREFIX` validates the version headers and runs the exact
+installed CLI for `--version` and a greeting. Missing executables, nonzero exits, unexpected output,
+and ten-second execution timeouts fail the check. The command must run on the target platform.
+
+Both PR native jobs and release publishing also build the existing C++ consumer against the
+Release installation and run its CTest check. Pass `-DMONOREPO_INSTALL_PREFIX=ABSOLUTE_PREFIX` when
+configuring the consumer; package discovery is restricted to that installation. This catches missing
+libraries, broken exports, and link/runtime failures without repeating the full unit-test suite in
+release jobs. Failed checks prevent packaging and upload.
+
+## Workflow linting
+
+The Python quality job runs `uv run pre-commit run actionlint --all-files`. Local commits use the
+same actionlint hook for changed workflow files. Its version is pinned in the pre-commit config;
+optional ShellCheck and Pyflakes integrations are disabled so installed optional tools do not
+change the result. No separate workflow-lint job is required.
