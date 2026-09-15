@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.0...v0.4.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* address repository review findings ([0bb1463](https://github.com/dlly11/python-c-monorepo-template/commit/0bb14630e8a7b20c574157032b6681568153927e))
+
 ## [0.4.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.3.0...v0.4.0) (2026-09-15)
 
 
