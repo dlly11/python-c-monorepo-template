@@ -109,8 +109,12 @@ The tooling wheel uses its own version and artifact directory.
 
 Add a `SMOKE_CHECKS` entry in
 [python_smoke_checks.py](../tools/repo_tools/src/repo_tools/python_smoke_checks.py) when introducing
-a product distribution. These checks cover the exercised install/API paths; the ordinary component
-tests remain responsible for deeper behavior.
+a product distribution. Each `SmokeCheck` holds its import namespace, API example, and optional
+`SmokeCommand` cases for installed executables. Command cases specify the executable name without
+a platform suffix, arguments, and expected exit status/output. Keep CLI expectations in that entry when renaming
+or adding an application; the installer runs those cases from the isolated environment rather
+than matching product names. These checks cover the exercised install/API paths; ordinary
+component tests remain responsible for deeper behavior.
 CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
 version test matrix. The release workflow continues to build the same distribution formats.
 
@@ -181,6 +185,10 @@ Install Python 3.12, uv, CMake, Ninja, GCC, and gcov, then run:
 uv sync --locked --all-packages --group coverage
 uv run --group coverage repo-tools check-coverage
 ```
+
+For an approved local CppUTest tree, add `--cpputest-source PATH`; see the
+[offline native setup](native-quality.md#cpputest-dependency-policy). Preconfiguring a CMake cache
+with a local source is insufficient because coverage cleans its build directory before each run.
 
 Coverage rejects platforms other than Linux before probing dependencies or changing outputs.
 Documentation and coverage check that the selected checkout's first-party packages and required

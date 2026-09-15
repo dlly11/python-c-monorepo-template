@@ -56,6 +56,19 @@ cmake --preset dev -DFETCHCONTENT_SOURCE_DIR_CPPUTEST=/approved/sources/cpputest
   -DFETCHCONTENT_FULLY_DISCONNECTED=ON
 ```
 
+For the combined Python/native coverage command, pass the source on each invocation:
+
+```bash
+uv run --group coverage repo-tools check-coverage --cpputest-source /approved/sources/cpputest
+```
+
+This sets both CMake options above after cleaning the coverage build directory. Relative source
+paths resolve from the working directory, including when `--project-root` selects another checkout.
+Keep the extracted sources outside that checkout's `build/coverage` directory; the command rejects
+missing sources, directories without `CMakeLists.txt`, and sources inside the directory it cleans
+before changing output. The supplied tree must be the approved CppUTest source described above.
+Python dependencies must already be installed or available through an offline uv cache.
+
 Disconnected configuration fails before downloading if no valid local source override or existing
 `CppUTest::CppUTest` target is supplied. The `analysis` and `release` presets disable tests and do
 not fetch CppUTest. Analysis compiles production targets with clang-tidy/cppcheck; `format-c-check`

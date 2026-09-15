@@ -36,7 +36,8 @@ def workspace_errors(root: Path) -> list[str]:
     smoke_names = [normalized_name(name) for name in SMOKE_CHECKS]
     errors.extend(registration_errors("python_smoke_checks.SMOKE_CHECKS", names, smoke_names))
     member_namespaces = {member.name: member.namespaces for member in members}
-    for name, (namespace, _) in SMOKE_CHECKS.items():
+    for name, smoke in SMOKE_CHECKS.items():
+        namespace = smoke.namespace
         if (
             normalized_name(name) in member_namespaces
             and namespace not in member_namespaces[normalized_name(name)]

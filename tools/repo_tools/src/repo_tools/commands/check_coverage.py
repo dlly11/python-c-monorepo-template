@@ -80,6 +80,12 @@ def write_summary(failures: list[str], report_root: Path) -> None:
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Register command arguments without performing any work."""
+    parser.add_argument(
+        "--cpputest-source",
+        type=Path,
+        metavar="PATH",
+        help="use extracted local CppUTest sources without downloading (relative to cwd)",
+    )
 
 
 def execute(args: argparse.Namespace, *, root: Path) -> int:
@@ -90,8 +96,24 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
             "No fresh results generated; existing coverage reports are unchanged.", file=sys.stderr
         )
         return 1
-    check_environment(root, group="coverage", command="check-coverage")
     build_root = root / "build/coverage"
+    configure = ["cmake", "--preset", "coverage"]
+    if args.cpputest_source is not None:
+        source = args.cpputest_source.resolve()
+        if not (source / "CMakeLists.txt").is_file():
+            raise ValueError(
+                f"--cpputest-source must contain CMakeLists.txt: {source}. "
+                "Existing coverage reports are unchanged."
+            )
+        if source.is_relative_to(build_root.resolve()):
+            raise ValueError(
+                f"--cpputest-source must be outside the cleaned coverage directory: {source}. "
+                "Existing coverage reports are unchanged."
+            )
+        configure.extend(
+            [f"-DFETCHCONTENT_SOURCE_DIR_CPPUTEST={source}", "-DFETCHCONTENT_FULLY_DISCONNECTED=ON"]
+        )
+    check_environment(root, group="coverage", command="check-coverage")
     report_root = build_root / "reports"
     python_report_root = report_root / "python"
     native_report_root = report_root / "native"
@@ -126,9 +148,7 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
     if python_status != 0:
         failures.append("Python coverage")
 
-    configure_status = run_check(
-        "Configure native coverage", ["cmake", "--preset", "coverage"], root=root
-    )
+    configure_status = run_check("Configure native coverage", configure, root=root)
     if configure_status != 0:
         failures.append("native configuration")
     else:
