@@ -165,6 +165,11 @@ def merged_pr(
     repository: str, commit: str, *, root: Path | None = None
 ) -> tuple[dict[str, Any], list[str]]:
     """Validate a PR's final commit and return its first-parent integration, oldest first."""
+    if git("rev-parse", "--is-shallow-repository", root=root).strip() == "true":
+        raise ValueError(
+            "merged PR validation requires full Git history; "
+            "use checkout fetch-depth: 0 or run git fetch --unshallow in the target checkout"
+        )
     parents = git("show", "--no-patch", "--format=%P", commit, "--", root=root).split()
     if len(parents) not in {1, 2}:
         raise ValueError(f"{commit}: expected a one-parent commit or two-parent merge commit")
