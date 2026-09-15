@@ -16,7 +16,9 @@ permissions:
 jobs:
   merged-pr:
     name: Merged PR verification
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push' &&
+      !(github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -38,7 +40,9 @@ jobs:
 
   python-quality:
     name: Python quality
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,6 +51,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Validate new commit subjects
+        if: github.event_name != 'push'
         env:
           COMMIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || format('origin/{0}', github.event.repository.default_branch) }}
           COMMIT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -55,6 +60,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked --all-packages
+      - run: uv run pre-commit run actionlint --all-files
       - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
       - run: uv run python scripts/check_workspace.py
@@ -62,8 +68,10 @@ jobs:
       - run: uv run python scripts/check_versions.py
       - run: uv run python scripts/check_python_install.py
       - name: Record tested PR contents
+        if: github.event_name != 'push'
         run: python scripts/check_merge.py --record build/pr-validation/validation.json
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'push'
         with:
           name: pr-validation
           path: build/pr-validation/validation.json
@@ -72,7 +80,9 @@ jobs:
 
   python-tests:
     name: Python ${{ matrix.python-version }}
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -92,7 +102,9 @@ jobs:
 
   coverage:
     name: Coverage
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -118,7 +130,9 @@ jobs:
           retention-days: 14
 
   documentation:
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     name: Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -136,7 +150,9 @@ jobs:
 
   native-build:
     name: Native build (${{ matrix.os }})
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -167,13 +183,25 @@ jobs:
         run: |
           cmake --install build/dev --prefix build/dev/stage
           python scripts/check_native_install.py build/dev/stage
-          cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/dev/stage"
+          cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DMONOREPO_INSTALL_PREFIX="${{ github.workspace }}/build/dev/stage"
           cmake --build build/install-consumer
           ctest --test-dir build/install-consumer --output-on-failure
 
+      - name: Smoke-test the Release installation
+        run: |
+          cmake --preset release
+          cmake --build --preset release
+          cmake --install build/release --prefix build/release/stage
+          python scripts/check_native_install.py build/release/stage
+          cmake -S native/tests/install_consumer -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${{ github.workspace }}/build/release/stage"
+          cmake --build build/release-consumer
+          ctest --test-dir build/release-consumer --output-on-failure
+
   native-analysis:
     name: Native static analysis
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -189,7 +217,9 @@ jobs:
 
   sanitizers:
     name: Native sanitizers
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name != 'push' ||
+      (github.event.before == '0000000000000000000000000000000000000000' || github.event.before == '0000000000000000000000000000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

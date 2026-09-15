@@ -118,7 +118,8 @@ The release workflow runs after successful **post-merge verification on the curr
 
 Automatic release runs for superseded commits skip without calling Release Please. The gate
 rechecks `main` immediately before that call; automatic and manual runs share one concurrency
-group. A passing PR check or manually dispatched CI run does not substitute for push CI.
+group. A passing PR check or ordinary manual CI run does not automatically substitute for push CI.
+The explicit recovery procedure below can authorize a release from fresh manual main validation.
 The push run is now a lightweight verification of the PR results, not another full suite.
 
 To retry release preparation manually, select `main`:
@@ -136,6 +137,38 @@ use the recovery procedure below once a release has already been created.
 The repository intentionally does not publish the example package names to PyPI. Add a separate,
 environment-protected publication job using trusted publishing after replacing the example names
 and choosing an artifact registry.
+
+## Recovering expired CI evidence
+
+Use this procedure if the original PR validation artifact is unavailable and the original run can
+no longer be retried. GitHub permits reruns only within 30 days of a run's initial execution.
+
+First dispatch the existing full CI suite on current main:
+
+```bash
+gh workflow run ci.yml --ref main
+gh run list --workflow ci.yml --branch main --event workflow_dispatch --limit 5
+CI_RUN_ID=123456789  # Replace with the new run ID from the list.
+gh run watch "${CI_RUN_ID}" --exit-status
+```
+
+Only after it succeeds, explicitly select that evidence for Release:
+
+```bash
+gh workflow run release.yml --ref main -f "recovery-run-id=${CI_RUN_ID}"
+```
+
+The gate requires the latest manual CI run for the exact current main commit, the correct repository
+and workflow, every required quality job completed successfully, and a matching validation record
+including the checkout SHA and Git tree. It independently checks the final Conventional Commit
+subject and merged-PR association. Skipped jobs, expired/mismatched records, or pending/failed runs
+reject recovery. The separate PR title job is replaced by validation of the actual squash subject.
+The gate rechecks the CI run and main after reading evidence; if main advances, start again on the
+new head. Initialization commits without a merged PR cannot use this procedure.
+
+This explicit dispatch authorizes release preparation/creation. It does not repair an old push run
+or recover missing release assets. Ordinary automatic releases continue to require successful push
+verification. Leave `recovery-run-id` empty for the ordinary manual release retry.
 
 ## GitHub repository settings
 
@@ -232,7 +265,8 @@ For a missing Python distribution:
 
 ```bash
 uv build --all-packages --out-dir dist
-# Upload only the missing/rebuilt asset; replace this example filename as needed.
+python scripts/check_python_install.py --dist dist
+# Only after every wheel passes; upload only the missing/rebuilt asset; replace this example filename as needed.
 gh release upload "${RELEASE_TAG}" dist/example_core-1.2.3-py3-none-any.whl --clobber
 ```
 
@@ -251,6 +285,9 @@ cmake --preset release
 cmake --build --preset release
 cmake --install build/release --prefix stage
 python scripts/check_native_install.py stage
+cmake -S native/tests/install_consumer -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${PWD}/stage"
+cmake --build build/release-consumer
+ctest --test-dir build/release-consumer --output-on-failure
 cmake -E make_directory dist
 cmake -E chdir stage cmake -E tar cf "../dist/${ARCHIVE}" --format=zip .
 gh release upload "${RELEASE_TAG}" "dist/${ARCHIVE}" --clobber

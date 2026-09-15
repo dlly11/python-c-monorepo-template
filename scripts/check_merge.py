@@ -97,8 +97,8 @@ def check_ci_run(
         raise ValueError(f"unsupported PR CI event: {run['event']!r}")
 
 
-def verify_commit(repository: str, commit: str, required: set[str], workflow_id: int) -> None:
-    """Bind one merged tree to a successful PR run and all required CI jobs."""
+def merged_pr(repository: str, commit: str) -> dict[str, Any]:
+    """Require a conventional squash commit associated with one merged main PR."""
     if len(git("show", "--no-patch", "--format=%P", commit, "--").split()) != 1:
         raise ValueError(f"{commit}: expected a squash commit with one parent")
     if not check_message(git("show", "--no-patch", "--format=%B", commit, "--"), commit[:12]):
@@ -114,7 +114,56 @@ def verify_commit(repository: str, commit: str, required: set[str], workflow_id:
     ]
     if len(candidates) != 1:
         raise ValueError(f"{commit}: expected exactly one merged PR targeting main")
-    pr = api(f"repos/{repository}/pulls/{candidates[0]['number']}")
+    return api(f"repos/{repository}/pulls/{candidates[0]['number']}")
+
+
+def required_ci_jobs() -> set[str]:
+    """Read the required CI job names; final subjects replace the separate title check."""
+    required = {
+        check["context"]
+        for check in load_policy()["protection"]["required_status_checks"]["checks"]
+    }
+    required.remove("Conventional PR title")
+    return required
+
+
+def check_jobs(repository: str, run_id: int, required: set[str]) -> None:
+    """Require every quality job to have actually succeeded, including partial reruns."""
+    jobs = items(
+        f"repos/{repository}/actions/runs/{run_id}/jobs?filter=latest&per_page=100", "jobs"
+    )
+    for name in sorted(required):
+        matches = [job for job in jobs if job["name"] == name]
+        if (
+            len(matches) != 1
+            or matches[0]["status"] != "completed"
+            or matches[0]["conclusion"] != "success"
+        ):
+            raise ValueError(f"CI run {run_id}: required CI job {name!r} did not pass")
+
+
+def check_evidence(
+    repository: str, run_id: int, head: str, commit: str, *, exact_checkout: bool = False
+) -> None:
+    """Bind the recorded tested tree to a commit; recovery also binds the checkout SHA."""
+    evidence = validation_record(repository, run_id)
+    expected = {
+        "schema": 1,
+        "repository": repository,
+        "run_id": run_id,
+        "head_sha": head,
+        "tree_sha": git("rev-parse", f"{commit}^{{tree}}").strip(),
+    }
+    if exact_checkout:
+        expected["checkout_sha"] = commit
+    for key, value in expected.items():
+        if type(evidence.get(key)) is not type(value) or evidence.get(key) != value:
+            raise ValueError(f"CI run {run_id}: validation {key} does not match the commit/run")
+
+
+def verify_commit(repository: str, commit: str, required: set[str], workflow_id: int) -> None:
+    """Bind one merged tree to a successful PR run and all required CI jobs."""
+    pr = merged_pr(repository, commit)
     query = urlencode({"head_sha": pr["head"]["sha"], "per_page": 100})
     runs = items(
         f"repos/{repository}/actions/workflows/{workflow_id}/runs?{query}", "workflow_runs"
@@ -129,30 +178,8 @@ def verify_commit(repository: str, commit: str, required: set[str], workflow_id:
         raise ValueError(f"PR #{pr['number']}: no PR CI run found")
     run = api(f"repos/{repository}/actions/runs/{max(runs, key=lambda run: run['id'])['id']}")
     check_ci_run(run, repository, pr, workflow_id)
-    jobs = items(
-        f"repos/{repository}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100", "jobs"
-    )
-    for name in sorted(required):
-        matches = [job for job in jobs if job["name"] == name]
-        if (
-            len(matches) != 1
-            or matches[0]["status"] != "completed"
-            or matches[0]["conclusion"] != "success"
-        ):
-            raise ValueError(f"PR #{pr['number']}: required CI job {name!r} did not pass")
-    evidence = validation_record(repository, run["id"])
-    expected = {
-        "schema": 1,
-        "repository": repository,
-        "run_id": run["id"],
-        "head_sha": pr["head"]["sha"],
-        "tree_sha": git("rev-parse", f"{commit}^{{tree}}").strip(),
-    }
-    for key, value in expected.items():
-        if type(evidence.get(key)) is not type(value) or evidence.get(key) != value:
-            raise ValueError(
-                f"PR #{pr['number']}: validation {key} does not match the merged commit/run"
-            )
+    check_jobs(repository, run["id"], required)
+    check_evidence(repository, run["id"], pr["head"]["sha"], commit)
     # A re-run may have started while the evidence was downloaded.
     check_ci_run(api(f"repos/{repository}/actions/runs/{run['id']}"), repository, pr, workflow_id)
     print(f"Verified {commit[:12]} matches PR #{pr['number']}'s tested tree, CI run {run['id']}.")
@@ -172,6 +199,11 @@ def main() -> int:
         if args.record:
             record(args.record)
             return 0
+        if args.base in {"0" * 40, "0" * 64}:
+            raise ValueError(
+                "initial branch creation has no merged PR to verify; run bootstrap quality "
+                "checks and submit setup changes through a protected PR before releasing"
+            )
         repository = repository_name(os.environ.get("GITHUB_REPOSITORY"))
         base = git("rev-parse", "--verify", "--end-of-options", f"{args.base}^{{commit}}").strip()
         head = git("rev-parse", "--verify", "--end-of-options", f"{args.head}^{{commit}}").strip()
@@ -181,11 +213,7 @@ def main() -> int:
         ).splitlines()
         if not commits:
             raise ValueError("push verification requires at least one new main commit")
-        policy = load_policy()
-        required = {
-            check["context"] for check in policy["protection"]["required_status_checks"]["checks"]
-        }
-        required.remove("Conventional PR title")  # Actual squash subjects are checked above.
+        required = required_ci_jobs()
         workflow_id = api(f"repos/{repository}/actions/workflows/ci.yml")["id"]
         for commit in commits:
             verify_commit(repository, commit, required, workflow_id)
@@ -199,7 +227,8 @@ def main() -> int:
     ) as error:
         print(f"merge verification failed: {error}", file=sys.stderr)
         print(
-            "For missing/expired evidence, rerun the original PR CI, then retry push CI.",
+            "For missing evidence, retry PR CI within 30 days of its initial run. Otherwise, "
+            "run fresh CI on main and use Release recovery-run-id; see docs/testing.md.",
             file=sys.stderr,
         )
         return 1

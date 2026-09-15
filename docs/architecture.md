@@ -131,7 +131,7 @@ cmake --preset release
 cmake --build --preset release
 cmake --install build/release --prefix stage
 cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja \
-  -DCMAKE_PREFIX_PATH="$PWD/stage"
+  -DMONOREPO_INSTALL_PREFIX="$PWD/stage"
 cmake --build build/install-consumer
 ctest --test-dir build/install-consumer --output-on-failure
 ```

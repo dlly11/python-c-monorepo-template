@@ -135,3 +135,7 @@ Dependabot uses an explicit `chore` commit prefix with a dependency scope for uv
 and pre-commit updates. Subjects such as `chore(deps): bump dependency` and
 `chore(deps-dev): update tools` satisfy the Conventional Commit policy without relying on inferred
 repository style. Weekly schedules and update groups are configured in `.github/dependabot.yml`.
+
+The actionlint version has one source: its official hook revision in the pre-commit configuration.
+Python quality invokes that exact hook, and Dependabot's existing pre-commit updates cover upgrades.
+After upgrading, run `uv run pre-commit run actionlint --all-files` and review any new diagnostics.
