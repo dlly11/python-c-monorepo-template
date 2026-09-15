@@ -4,6 +4,33 @@ option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behaviour sanitizers" OFF)
 option(ENABLE_COVERAGE "Instrument native targets for GCC coverage reporting" OFF)
 
+function(monorepo_set_instrumentation target language)
+  if(ENABLE_SANITIZERS)
+    if(MSVC)
+      message(FATAL_ERROR "The sanitizer preset is currently supported only with GCC or Clang")
+    endif()
+    target_compile_options(
+      ${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    )
+    target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+  endif()
+
+  if(ENABLE_COVERAGE)
+    if(ENABLE_SANITIZERS)
+      message(FATAL_ERROR "Coverage and sanitizer instrumentation cannot be enabled together")
+    endif()
+    if(NOT CMAKE_${language}_COMPILER_ID STREQUAL "GNU")
+      message(FATAL_ERROR "Native coverage requires GNU compilers and gcov")
+    endif()
+
+    target_compile_options(${target} PRIVATE --coverage -Og -g)
+    get_target_property(monorepo_target_type ${target} TYPE)
+    if(NOT monorepo_target_type STREQUAL "STATIC_LIBRARY")
+      target_link_options(${target} PRIVATE --coverage)
+    endif()
+  endif()
+endfunction()
+
 function(monorepo_set_project_options target)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4)
@@ -35,30 +62,7 @@ function(monorepo_set_project_options target)
       C_EXTENSIONS NO
   )
 
-  if(ENABLE_SANITIZERS)
-    if(MSVC)
-      message(FATAL_ERROR "The sanitizer preset is currently supported only with GCC or Clang")
-    endif()
-    target_compile_options(
-      ${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
-    )
-    target_link_options(${target} PRIVATE -fsanitize=address,undefined)
-  endif()
-
-  if(ENABLE_COVERAGE)
-    if(ENABLE_SANITIZERS)
-      message(FATAL_ERROR "Coverage and sanitizer instrumentation cannot be enabled together")
-    endif()
-    if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
-      message(FATAL_ERROR "Native coverage requires GCC and gcov")
-    endif()
-
-    target_compile_options(${target} PRIVATE --coverage -Og -g)
-    get_target_property(monorepo_target_type ${target} TYPE)
-    if(NOT monorepo_target_type STREQUAL "STATIC_LIBRARY")
-      target_link_options(${target} PRIVATE --coverage)
-    endif()
-  endif()
+  monorepo_set_instrumentation(${target} C)
 
   monorepo_enable_static_analysis(${target})
 endfunction()
@@ -98,28 +102,5 @@ function(monorepo_set_cpp_test_options target)
       CXX_EXTENSIONS NO
   )
 
-  if(ENABLE_SANITIZERS)
-    if(MSVC)
-      message(FATAL_ERROR "The sanitizer preset is currently supported only with GCC or Clang")
-    endif()
-    target_compile_options(
-      ${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
-    )
-    target_link_options(${target} PRIVATE -fsanitize=address,undefined)
-  endif()
-
-  if(ENABLE_COVERAGE)
-    if(ENABLE_SANITIZERS)
-      message(FATAL_ERROR "Coverage and sanitizer instrumentation cannot be enabled together")
-    endif()
-    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-      message(FATAL_ERROR "Native test coverage requires G++ and gcov")
-    endif()
-
-    target_compile_options(${target} PRIVATE --coverage -Og -g)
-    get_target_property(monorepo_target_type ${target} TYPE)
-    if(NOT monorepo_target_type STREQUAL "STATIC_LIBRARY")
-      target_link_options(${target} PRIVATE --coverage)
-    endif()
-  endif()
+  monorepo_set_instrumentation(${target} CXX)
 endfunction()

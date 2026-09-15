@@ -22,6 +22,12 @@ function(monorepo_add_cpputest)
         "${cpputest_SOURCE_DIR}"
       )
     endif()
+  elseif(FETCHCONTENT_FULLY_DISCONNECTED)
+    message(
+      FATAL_ERROR
+      "Disconnected builds require FETCHCONTENT_SOURCE_DIR_CPPUTEST pointing to a local "
+      "CppUTest source tree, or an existing CppUTest::CppUTest target"
+    )
   else()
     FetchContent_Populate(
       CppUTest

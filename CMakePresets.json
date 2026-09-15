@@ -33,7 +33,8 @@
       "cacheVariables": {
         "ENABLE_CLANG_TIDY": "ON",
         "ENABLE_CPPCHECK": "ON",
-        "REQUIRE_ANALYSIS_TOOLS": "ON"
+        "REQUIRE_ANALYSIS_TOOLS": "ON",
+        "BUILD_TESTING": "OFF"
       }
     },
     {
@@ -102,13 +103,6 @@
     {
       "name": "dev",
       "configurePreset": "dev",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "analysis",
-      "configurePreset": "analysis",
       "output": {
         "outputOnFailure": true
       }
