@@ -222,6 +222,22 @@ def test_fresh_main_ci_recovers_without_original_pr_artifact(
     assert recover(module, state)
 
 
+def test_recovery_checks_preserved_commit_subjects(
+    recovery_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = recovery_context
+    git = state["git"]
+    head = git("commit-tree", state["tree"], "-p", state["head"], "-m", "Unconventional")
+    merged = git("commit-tree", state["tree"], "-p", state["base"], "-p", head, "-m", "fix: merge")
+    state.update(merge=merged, current=merged)
+    state["pr"].update(merge_commit_sha=merged)
+    state["pr"]["head"]["sha"] = head
+    state["runs"][0]["head_sha"] = merged
+    state["evidence"].update(head_sha=merged, checkout_sha=merged)
+    with pytest.raises(ValueError, match="merged PR commit subject"):
+        recover(module, state)
+
+
 @pytest.mark.parametrize("defect", ["missing", "skipped", "failure", "duplicate"])
 def test_recovery_requires_all_quality_jobs(
     recovery_context: tuple[ModuleType, dict[str, Any]],
@@ -344,7 +360,7 @@ def test_bootstrap_root_cannot_use_recovery(
     state["merge"] = state["base"]
     state["current"] = state["base"]
     state["runs"][0]["head_sha"] = state["base"]
-    with pytest.raises(ValueError, match="squash commit with one parent"):
+    with pytest.raises(ValueError, match="squash commit or two-parent merge commit"):
         recover(module, state)
 
 

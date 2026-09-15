@@ -51,10 +51,10 @@ the older compatible version.
 ## Conventional Commits
 
 Release Please derives the next version and changelog from commits on `main`. This template
-validates both new commit subjects and pull request titles, and uses squash merges to turn each
-validated PR title into the commit subject on `main`.
+validates both new commit subjects and pull request titles. GitHub's squash and merge commit
+defaults use the validated PR title as the resulting commit subject on `main`.
 
-| Pull request title | Version effect |
+| Conventional subject | Version effect |
 | --- | --- |
 | `fix(core): handle an empty name` | Patch (`1.2.3` to `1.2.4`) |
 | `feat(package-a): add JSON output` | Minor (`1.2.3` to `1.3.0`) |
@@ -65,9 +65,16 @@ Use the [contribution guide](CONTRIBUTING.md#commit-messages-and-pull-requests) 
 hook setup, and repair commands. CI event behavior and checked commit ranges are documented once
 in [testing](testing.md#pr-and-post-merge-responsibilities). Bootstrap pushes skip inherited subjects.
 
-For breaking changes, put `!` in the PR title and explain migration in a `BREAKING CHANGE:` footer
-in the final squash body. Bodies and footers are not linted. For a manual title check, select the
-open PR's current head branch and number:
+Squashing produces one commit per PR. Creating a merge commit preserves the individual commits
+as well, so their release signals and changelog entries can contribute to the release. For example,
+a preserved `feat:` commit can request a minor release even if the PR title starts with `fix:`.
+Review the generated release PR before merging it. Both methods are supported for release PRs;
+rebase merging is disabled.
+
+For breaking changes, put `!` in the PR title and in the relevant individual commit when preserving
+commits. Explain migration in a `BREAKING CHANGE:` footer in the final commit body. Squash bodies
+default to the commit messages; merge commit bodies default to the PR description. Bodies and
+footers are not linted. For a manual title check, select the open PR's current head branch and number:
 
 ```bash
 gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
@@ -139,8 +146,9 @@ gh workflow run release.yml --ref main -f "recovery-run-id=${CI_RUN_ID}"
 The gate requires the latest manual CI run for the exact current main commit, the correct repository
 and workflow, every required quality job completed successfully, and a matching validation record
 including the checkout SHA and Git tree. It independently checks the final Conventional Commit
-subject and merged-PR association. Skipped jobs, expired/mismatched records, or pending/failed runs
-reject recovery. The separate PR title job is replaced by validation of the actual squash subject.
+subject and merged-PR association, plus the second parent and preserved commit subjects for merge
+commits. Skipped jobs, expired/mismatched records, or pending/failed runs reject recovery. The
+separate PR title job is replaced by validation of the actual squash or merge commit subject.
 The gate rechecks the CI run and main after reading evidence; if main advances, start again on the
 new head. Initialization commits without a merged PR cannot use this procedure.
 
@@ -164,14 +172,22 @@ repository created from this template before relying on enforcement or unattende
    `Coverage` includes the Python 3.12 tests; only Python 3.13 and 3.14 need separate required
    compatibility checks.
    **Merged PR verification** runs after merging and must not be a required PR check.
-3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, disable merge
-   commits and rebase merging, and select a squash commit default that uses the **pull request
-   title** even for single-commit PRs (`squash_merge_commit_title: PR_TITLE`). Require linear
-   history on `main`. Keep the validated subject when confirming a squash merge; the UI still
-   permits editing that default, and the push check detects invalid subjects after merging.
+3. Under **Settings > General > Pull Requests**, enable **Allow squash merging** and **Allow merge
+   commits**, and disable rebase merging. Use the **pull request title** for both commit title
+   defaults (`squash_merge_commit_title: PR_TITLE`, `merge_commit_title: PR_TITLE`), including
+   single-commit squash PRs. Use commit messages for squash bodies and the PR description for
+   merge bodies (`squash_merge_commit_message: COMMIT_MESSAGES`, `merge_commit_message: PR_BODY`).
+   Turn off **Require linear history** on `main` to permit merge commits. Keep the validated
+   subject when confirming either merge method; the UI still permits editing that default,
+   and the push check detects invalid subjects after merging.
 4. Restrict release tag creation to maintainers and the release workflow. Run both workflows on
    a PR before selecting their required check names. The title check belongs to `pr-title.yml`;
    renaming jobs later requires updating the protection settings.
+
+When upgrading an existing squash-only repository, squash-merge the verifier update first. Then
+enable merge commits, configure their title/body defaults, and turn off required linear history
+as above. Run the [settings audit](#audit-the-managed-github-settings) to confirm the transition.
+Enabling the settings before the updated verifier reaches `main` can cause post-merge CI failures.
 
 The workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions. GitHub suppresses
 ordinary workflow events caused by that token, so the release workflow deliberately invokes
@@ -188,7 +204,7 @@ migration.
 `tools/github/repository-policy.json` records the intended default branch, merge defaults, PR
 requirements, required checks and GitHub Actions source IDs, administrator enforcement, and
 linear-history/force-push/deletion settings. It preserves the current solo-maintainer policy with
-zero required approvals and `COMMIT_MESSAGES` as the squash body default.
+zero required approvals, permits squash and merge commits, and keeps rebase merging disabled.
 
 With an authenticated GitHub CLI, run the read-only audit manually:
 

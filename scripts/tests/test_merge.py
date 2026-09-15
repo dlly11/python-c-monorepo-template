@@ -12,12 +12,74 @@ import pytest
 REPOSITORY = "owner/project"
 
 
-def test_squash_sha_changes_but_tested_tree_matches(
+def test_merge_sha_changes_but_tested_tree_matches(
     merge_context: tuple[ModuleType, dict[str, Any]],
 ) -> None:
     _module, state = merge_context
     assert state["head"] != state["merge"]
     assert state["cli"].main() == 0
+
+
+def test_push_can_mix_merge_methods(
+    merge_context: tuple[ModuleType, dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module, state = merge_context
+    git = state["git"]
+    (tmp_path / "source.txt").write_text("second PR\n", encoding="utf-8")
+    git("add", "source.txt")
+    tree = git("write-tree")
+    head = git("commit-tree", tree, "-p", state["merge"], "-m", "feat: second change")
+    parents = ["-p", state["merge"]]
+    if state["method"] == "squash":
+        parents.extend(["-p", head])
+    merged = git("commit-tree", tree, *parents, "-m", "feat: second change (#2)")
+    pr = deepcopy(state["pr"])
+    pr.update(number=2, merge_commit_sha=merged)
+    pr["head"].update(sha=head, ref="second-topic")
+    run = dict(state["runs"][0], id=200, head_sha=head, head_branch="second-topic")
+    evidence = dict(state["evidence"], run_id=200, head_sha=head, tree_sha=tree)
+    original_api, original_items = module.api, module.items
+
+    def api(endpoint: str) -> dict[str, Any]:
+        if endpoint.endswith("/pulls/2"):
+            return pr
+        if endpoint.endswith("/runs/200"):
+            return run
+        return original_api(endpoint)
+
+    def items(endpoint: str, key: str | None = None) -> list[dict[str, Any]]:
+        if f"/commits/{merged}/pulls?" in endpoint:
+            return [pr]
+        if f"head_sha={head}" in endpoint:
+            return [run]
+        return original_items(endpoint, key)
+
+    monkeypatch.setattr(module, "api", api)
+    monkeypatch.setattr(module, "items", items)
+    monkeypatch.setattr(
+        module,
+        "validation_record",
+        lambda repository, run_id: evidence if run_id == 200 else state["evidence"],
+    )
+    assert state["cli"].main(["--base", state["base"], "--head", merged]) == 0
+    output = capsys.readouterr().out
+    assert "PR #1's tested tree" in output and "PR #2's tested tree" in output
+
+
+def test_preserved_commit_subjects_are_checked(
+    merge_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = merge_context
+    git = state["git"]
+    head = git("commit-tree", state["tree"], "-p", state["head"], "-m", "fixup! change")
+    commit = git("commit-tree", state["tree"], "-p", state["base"], "-p", head, "-m", "fix: merge")
+    state["pr"].update(merge_commit_sha=commit)
+    state["pr"]["head"]["sha"] = head
+    with pytest.raises(ValueError, match="merged PR commit subject"):
+        module.verify_commit(REPOSITORY, commit, state["required"], 42)
 
 
 def test_manual_release_branch_ci_and_fork_pr_ci(
@@ -121,7 +183,7 @@ def test_rerun_started_during_download_is_rejected(
     assert state["cli"].main() == 1
 
 
-def test_default_merge_message_and_non_squash_commit_are_rejected(
+def test_nonconventional_subject_and_unsupported_parent_counts_are_rejected(
     merge_context: tuple[ModuleType, dict[str, Any]],
 ) -> None:
     module, state = merge_context
@@ -129,11 +191,42 @@ def test_default_merge_message_and_non_squash_commit_are_rejected(
     invalid = git("commit-tree", state["tree"], "-p", state["base"], "-m", "Update things")
     with pytest.raises(ValueError, match="subject"):
         module.verify_commit(REPOSITORY, invalid, state["required"], 42)
-    merge = git(
-        "commit-tree", state["tree"], "-p", state["base"], "-p", state["head"], "-m", "fix: merge"
+    for parents in [[], [state["base"], state["head"], invalid]]:
+        args = [arg for parent in parents for arg in ("-p", parent)]
+        commit = git("commit-tree", state["tree"], *args, "-m", "fix: merge")
+        with pytest.raises(ValueError, match="two-parent merge commit"):
+            module.verify_commit(REPOSITORY, commit, state["required"], 42)
+
+
+def test_merge_must_preserve_the_original_pr_head(
+    merge_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = merge_context
+    git = state["git"]
+    other = git("commit-tree", state["tree"], "-p", state["base"], "-m", "fix: unrelated")
+    commit = git("commit-tree", state["tree"], "-p", state["base"], "-p", other, "-m", "fix: merge")
+    state["pr"]["merge_commit_sha"] = commit
+    with pytest.raises(ValueError, match="second parent"):
+        module.verify_commit(REPOSITORY, commit, state["required"], 42)
+
+
+def test_default_github_merge_subject_is_rejected(
+    merge_context: tuple[ModuleType, dict[str, Any]],
+) -> None:
+    module, state = merge_context
+    commit = state["git"](
+        "commit-tree",
+        state["tree"],
+        "-p",
+        state["base"],
+        "-p",
+        state["head"],
+        "-m",
+        "Merge pull request #1 from owner/topic",
     )
-    with pytest.raises(ValueError, match="one parent"):
-        module.verify_commit(REPOSITORY, merge, state["required"], 42)
+    state["pr"]["merge_commit_sha"] = commit
+    with pytest.raises(ValueError, match="subject"):
+        module.verify_commit(REPOSITORY, commit, state["required"], 42)
 
 
 def test_record_uses_actual_synthetic_merge_tree(

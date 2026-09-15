@@ -38,23 +38,27 @@ documentation with `uv run --group docs python scripts/build_docs.py` and open
 | --- | --- | --- | --- |
 | Pull request | Full suite and separate title check | PR head commits outside the event's base SHA | Tested evidence for the later merge |
 | Manual CI | Full suite on selected branch | Commits outside `origin/main` (none on main) | Explicit recovery only on current main |
-| Ordinary main push | Merged PR verification and version check | New squash commits | Latest successful verified push on current main |
+| Ordinary main push | Merged PR verification and version check | New squash/merge subjects and preserved PR commits | Latest successful verified push on current main |
 | Initial branch creation (zero previous SHA) | Full suite; no validation record | Inherited history is the baseline and is skipped | Never |
 
 Python 3.12 runs in **Coverage**; compatibility jobs cover 3.13 and 3.14. Required check names live
 in `tools/github/repository-policy.json`. Pages builds/deploys independently on main. Release builds
 and smoke-tests tagged artifacts without repeating the PR test and analysis suite.
 
-Push CI on `main` runs only `Merged PR verification`. It checks each new squash commit's subject,
-finds its merged PR, verifies that the original head has a successful CI run with every required
-CI job completed successfully, and compares the merged Git tree with the recorded tested tree.
+Push CI on `main` runs only `Merged PR verification`. It walks the new first-parent history (the
+sequence of integrations onto main), accepting squash commits and two-parent merge commits. For
+each integration it checks the subject, finds its merged GitHub PR, verifies that the original head
+has a successful CI run with every required CI job completed successfully, and compares the merged
+Git tree with the recorded tested tree. A merge commit must have the PR head as its second parent;
+the verifier also checks subjects of the preserved PR commits newly introduced to main. Intermediate
+PR commits do not need their own validation records: CI certifies the final integrated contents.
 Skipped checks are not accepted as passing. Version metadata is checked without installing tools
 or rebuilding packages. The other CI jobs appear skipped on push runs because they already ran
 on the PR.
 
 The Python quality job uploads a small `pr-validation` JSON record of the actual checkout and
 tree, tied to its repository, run ID, and original head SHA. This distinguishes the PR's synthetic
-merge commit from the eventual squash commit while verifying identical tracked contents. Normal
+merge commit from the eventual squash or merge commit while verifying identical tracked contents. Normal
 PR runs and full manually dispatched release-branch runs both produce this record. It is validation
 metadata, not a distributable build artifact. Release distributions are built from their tag.
 
@@ -71,8 +75,9 @@ suite on the exact merged commit. Missing evidence never counts as success, and 
 historical push run is not rewritten as passing. Before merging a long-lived PR, push a new
 Conventional Commit to obtain fresh PR validation if the original run can no longer be retried.
 
-CI regressions cover changed squash SHAs with matching trees, content mismatches, wrong runs,
-missing/skipped jobs, release-bot manual dispatches, fork PRs, and unavailable artifacts. These
+CI regressions cover both merge methods with matching trees, content mismatches, wrong parents or
+subjects, mixed merge methods in one push, wrong runs, missing/skipped jobs, release-bot manual
+dispatches, fork PRs, and unavailable artifacts. These
 tests run in the existing pytest suite. The post-merge job needs contents, actions, and pull-request
 read permissions. Documentation deployment continues to build and deploy independently.
 
