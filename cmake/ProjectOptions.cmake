@@ -39,7 +39,9 @@ function(monorepo_set_project_options target)
     if(MSVC)
       message(FATAL_ERROR "The sanitizer preset is currently supported only with GCC or Clang")
     endif()
-    target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_compile_options(
+      ${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    )
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
   endif()
 
@@ -100,7 +102,9 @@ function(monorepo_set_cpp_test_options target)
     if(MSVC)
       message(FATAL_ERROR "The sanitizer preset is currently supported only with GCC or Clang")
     endif()
-    target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_compile_options(
+      ${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    )
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
   endif()
 

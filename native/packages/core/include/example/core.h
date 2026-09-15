@@ -22,6 +22,11 @@ typedef enum example_status {
 /**
  * Format a message as ``prefix, name!``.
  *
+ * Inputs must be null-terminated and must not overlap the output buffer.
+ * On success, output contains the complete null-terminated message. If the buffer
+ * is too small, output contains a null-terminated partial message. Invalid arguments
+ * leave the supplied output untouched. A formatting error sets output[0] to zero.
+ *
  * @param[in] prefix Non-empty message prefix.
  * @param[in] name Non-empty recipient name.
  * @param[out] output Destination buffer.

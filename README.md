@@ -53,7 +53,7 @@ See [the architecture guide](docs/architecture.md) for package boundaries and de
 - uv
 - CMake 3.25 or newer
 - Ninja
-- A C17 compiler: Clang, GCC, or MSVC
+- A C17 compiler: GCC or Clang (MSVC options are provided but are not verified in CI)
 - A C++17 compiler for native test builds
 - clang-format, clang-tidy, and cppcheck for native quality checks
 - GCC and gcov for native coverage checks
@@ -111,6 +111,9 @@ cmake --build --preset analysis --target format-c-check
 ctest --preset analysis
 ```
 
+The native CI matrix uses GCC on Linux, Clang on macOS, and GCC/MinGW on Windows. For a local
+Windows Ninja build, select GCC with `CC=gcc` and `CXX=g++` in the build environment.
+
 The analysis preset requires all three native quality tools:
 
 - **clang-format** is exposed through `format-c` and `format-c-check` build targets.
@@ -154,6 +157,9 @@ Build the same warning-free HTML site used by CI and GitHub Pages:
 uv sync --locked --all-packages --group docs
 uv run --group docs python scripts/build_docs.py
 ```
+
+Pull requests and manual CI runs validate the site; pushes to `main` build it in the Pages workflow
+for deployment, avoiding a duplicate CI build.
 
 Open `build/docs/html/index.html` after the build. Doxygen is a system prerequisite; the remaining
 documentation dependencies are locked by uv in the separate `docs` dependency group.

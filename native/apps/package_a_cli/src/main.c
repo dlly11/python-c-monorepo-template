@@ -10,7 +10,8 @@ int main(int argc, char **argv) {
     example_status status = EXAMPLE_STATUS_OK;
 
     if (argc == 2 && strcmp(argv[1], "--version") == 0) {
-        if (printf("package-a-cli %s\n", EXAMPLE_PACKAGE_A_CLI_VERSION) < 0) {
+        if (printf("package-a-cli %s\n", EXAMPLE_PACKAGE_A_CLI_VERSION) < 0 ||
+            fflush(stdout) == EOF) {
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -27,7 +28,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    if (puts(output) == EOF) {
+    if (puts(output) == EOF || fflush(stdout) == EOF) {
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

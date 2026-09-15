@@ -12,6 +12,9 @@ extern "C" {
 /**
  * Create a greeting using the shared core formatter.
  *
+ * The input, output, and failure contracts are the same as
+ * example_core_format_message().
+ *
  * @param[in] name Non-empty recipient name.
  * @param[out] output Destination buffer.
  * @param[in] output_capacity Size of @p output in bytes.

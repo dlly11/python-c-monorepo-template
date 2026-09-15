@@ -2,14 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(native_install_consumer LANGUAGES CXX)
 
-find_package(
-  MonorepoTemplate
-  CONFIG
-  REQUIRED
-  PATH_SUFFIXES
-    lib/cmake/monorepo-template
-    lib64/cmake/monorepo-template
-)
+find_package(MonorepoTemplate CONFIG REQUIRED)
 
 add_executable(native_install_consumer main.cpp)
 target_compile_features(native_install_consumer PRIVATE cxx_std_17)

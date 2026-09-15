@@ -2,4 +2,10 @@
 
 Example farewell service depending only on `example-core`.
 
-See the [component documentation](docs/index.md) for examples and API details.
+```python
+from example_package_b import FarewellService
+
+assert FarewellService().farewell("Ada").text == "Goodbye, Ada!"
+```
+
+See the [component documentation](https://dlly11.github.io/python-c-monorepo-template/python/packages/package_b/docs/index.html) for examples and API details.

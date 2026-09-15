@@ -20,6 +20,41 @@ TEST(CoreFormatMessage, ReportsSmallOutputBuffer) {
                 example_core_format_message("Hello", "Ada", output, sizeof(output)));
 }
 
+TEST(CoreFormatMessage, AcceptsExactFit) {
+    char output[sizeof("Hello, Ada!")] = {0};
+
+    LONGS_EQUAL(EXAMPLE_STATUS_OK,
+                example_core_format_message("Hello", "Ada", output, sizeof(output)));
+    STRCMP_EQUAL("Hello, Ada!", output);
+}
+
+TEST(CoreFormatMessage, TerminatesOutputOneByteShort) {
+    char output[sizeof("Hello, Ada!") - 1U] = {0};
+
+    LONGS_EQUAL(EXAMPLE_STATUS_BUFFER_TOO_SMALL,
+                example_core_format_message("Hello", "Ada", output, sizeof(output)));
+    STRCMP_EQUAL("Hello, Ada", output);
+}
+
+TEST(CoreFormatMessage, TerminatesSingleByteOutput) {
+    char output[1] = {'x'};
+
+    LONGS_EQUAL(EXAMPLE_STATUS_BUFFER_TOO_SMALL,
+                example_core_format_message("Hello", "Ada", output, sizeof(output)));
+    STRCMP_EQUAL("", output);
+}
+
+TEST(CoreFormatMessage, LeavesOutputUntouchedAfterValidationFailure) {
+    char output[] = "unchanged";
+
+    LONGS_EQUAL(EXAMPLE_STATUS_INVALID_ARGUMENT,
+                example_core_format_message("Hello", "", output, sizeof(output)));
+    STRCMP_EQUAL("unchanged", output);
+    LONGS_EQUAL(EXAMPLE_STATUS_INVALID_ARGUMENT,
+                example_core_format_message("Hello", "Ada", output, 0U));
+    STRCMP_EQUAL("unchanged", output);
+}
+
 TEST(CoreFormatMessage, RejectsInvalidArguments) {
     char output[64] = {0};
 

@@ -16,6 +16,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
-    args = build_parser().parse_args(argv)
-    print(GreetingService(prefix=args.prefix).greet(args.name).text)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        message = GreetingService(prefix=args.prefix).greet(args.name)
+    except ValueError as error:
+        parser.error(str(error))
+    print(message.text)
     return 0

@@ -34,6 +34,10 @@ suppressed because those headers are owned by the selected compiler toolchain.
 | `coverage` | Native test effectiveness | GCC/gcov line and branch coverage |
 | `release` | Optimized artifacts | Tests and analysis performed in earlier stages |
 
+The sanitizer preset enables AddressSanitizer and UndefinedBehaviorSanitizer for production and
+test code. Undefined behavior terminates the process with a failure status, making diagnostics
+visible to CTest rather than allowing a successful exit after a runtime error.
+
 Compiler warnings are errors in `dev`, `analysis`, and `asan`. Release consumers do not inherit
 the repository's private warning flags.
 

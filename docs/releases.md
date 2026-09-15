@@ -57,6 +57,16 @@ The supported title types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `pe
 `revert`, `style`, and `test`. Use a `BREAKING CHANGE:` footer when the title alone cannot explain
 a breaking change.
 
+The separate `PR title` workflow runs the **Conventional PR title** check on PR creation, reopening,
+new commits, and edits. It reads the current title, so fixing a title also fixes its check without
+rerunning the build matrix. The main CI workflow continues to run for code changes.
+
+For a manual title check, select the PR's current head branch and supply its number:
+
+```bash
+gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
+```
+
 ## Automated release sequence
 
 The release workflow runs after every push to `main`:
@@ -65,7 +75,8 @@ The release workflow runs after every push to `main`:
 2. The pull request updates `version.txt`, `CHANGELOG.md`, every Python project version, the CMake
    version, and the Release Please manifest.
 3. The workflow checks out the managed branch, regenerates `uv.lock`, commits it when changed, and
-   explicitly dispatches CI for the resulting release commit.
+   explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting release commit. The
+   title workflow receives the release PR number.
 4. A maintainer reviews and merges the release pull request after its required checks pass.
 5. Release Please creates the `vX.Y.Z` tag and GitHub Release on the next `main` run.
 6. The same workflow builds every Python wheel and source distribution, creates native install
@@ -81,16 +92,74 @@ and choosing an artifact registry.
 Configure the repository before relying on unattended releases:
 
 1. Under **Settings > Actions > General**, allow GitHub Actions to create pull requests.
-2. Protect `main`, require pull requests, and require the CI jobs appropriate to the repository.
+2. Protect `main`, require pull requests, and require the CI jobs appropriate to the repository,
+   including **Conventional PR title**. When adopting the separate title workflow, verify that the
+   existing required-check rule still binds to this check; update workflow-specific rules to
+   reference `pr-title.yml` after its first run.
 3. Prefer squash merging so the validated pull request title becomes the commit Release Please
    evaluates.
 4. Restrict direct pushes and tag creation to maintainers and the release workflow.
 
 The workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions. GitHub suppresses
 ordinary workflow events caused by that token, so the release workflow deliberately invokes
-`workflow_dispatch` for CI after synchronizing the release branch. No long-lived personal access
-token is required.
+`workflow_dispatch` for both CI and title validation after synchronizing the release branch.
+The title workflow uses only read access to contents and pull requests. No long-lived personal
+access token is required. Manual dispatch requires the workflow to exist on the default branch.
 
 The files `tools/release-please/config.json` and `tools/release-please/manifest.json` are Release
 Please policy and state. Change their structure only as part of an intentional release-policy
 migration.
+
+## Recovering missing release assets
+
+If a build or upload fails after the GitHub Release is created, open the original **Release**
+workflow run and choose **Re-run failed jobs**, or rerun the specific failed asset job. Retry from
+that run so the successful release-creation job's outputs remain available. GitHub documents
+[rerunning workflows and individual jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+
+Do not use a fresh **Run workflow** dispatch or **Re-run all jobs** to recover an existing release:
+Release Please no longer reports that release as newly created, and the asset jobs are conditional
+on that output. Rerunning a successful upload uses `--clobber` to replace its existing asset.
+
+If the original job can no longer be retried, rebuild from the exact release tag in a clean
+worktree, using the matching platform and compiler. The examples below use Bash and an already
+authenticated GitHub CLI with release-write access:
+
+```bash
+RELEASE_TAG=v1.2.3  # Replace with the existing release tag.
+git fetch origin tag "${RELEASE_TAG}"
+git worktree add --detach ../release-recovery "${RELEASE_TAG}"
+cd ../release-recovery
+python scripts/check_versions.py --tag "${RELEASE_TAG}"
+```
+
+For a missing Python distribution:
+
+```bash
+uv build --all-packages --out-dir dist
+# Upload only the missing/rebuilt asset; replace this example filename as needed.
+gh release upload "${RELEASE_TAG}" dist/example_core-1.2.3-py3-none-any.whl --clobber
+```
+
+For a missing native archive, use GCC/G++ on Linux, Clang/Clang++ on macOS, or GCC/G++ from
+MinGW on Windows. Set the archive labels to the original job's `runner.os` (`Linux`, `macOS`, or
+`Windows`) and `runner.arch` (`X64` or `ARM64`). These labels describe the build host; changing them
+does not cross-compile the program. For example, on Linux X64:
+
+```bash
+export CC=gcc CXX=g++
+RELEASE_OS=Linux
+RELEASE_ARCH=X64
+REPOSITORY_NAME=$(gh repo view --json name --jq .name)
+ARCHIVE="${REPOSITORY_NAME}-${RELEASE_TAG}-${RELEASE_OS}-${RELEASE_ARCH}.zip"
+cmake --preset release
+cmake --build --preset release
+cmake --install build/release --prefix stage
+python scripts/check_native_install.py stage
+cmake -E make_directory dist
+cmake -E chdir stage cmake -E tar cf "../dist/${ARCHIVE}" --format=zip .
+gh release upload "${RELEASE_TAG}" "dist/${ARCHIVE}" --clobber
+```
+
+Recovery attaches assets to the existing release; it does not require a new version, tag, or
+release-creation run. Inspect the release's assets after the upload completes.

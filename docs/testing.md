@@ -14,6 +14,17 @@ CppUTest is written in C++, so test-enabled native builds require a C++17 compil
 provide `extern "C"` guards for both the test harness and downstream C++ consumers. The dependency
 is fetched only when `BUILD_TESTING=ON` and is excluded from installation and release archives.
 
+CLI process tests check exit status, standard output, and standard error independently, including
+empty input. Linux additionally checks that greeting and version output fail when redirected to
+`/dev/full`. UBSan findings are fatal in sanitizer builds.
+
+## Repository script tests
+
+The normal `uv run pytest` command also discovers `scripts/tests`. These tests cover version
+validation, version-update rollback, native install validation, and PR-title syntax using temporary
+files and mocked uv invocations. They do not access the network or change committed metadata.
+Coverage thresholds continue to measure production packages rather than orchestration scripts.
+
 ## Coverage policy
 
 | Stack | Measured scope | Required coverage |
@@ -23,7 +34,8 @@ is fetched only when `BUILD_TESTING=ON` and is excluded from installation and re
 
 Python uses coverage.py through pytest-cov. Native coverage uses GCC/G++ instrumentation, gcov, and
 gcovr. The native coverage preset is intentionally Linux and GCC only; the normal native matrix
-continues to provide GCC, Clang, MSVC, macOS, and Windows portability checks.
+uses GCC on Linux, Clang on macOS, and GCC/MinGW on Windows. MSVC has compiler-option support in
+CMake but is not verified by the current CI matrix.
 
 Coverage gates must not be reduced merely to make a change pass. Add tests for observable
 behaviour, or make a separately reviewed policy change when the existing threshold is no longer

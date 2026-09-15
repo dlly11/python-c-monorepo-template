@@ -72,8 +72,18 @@ C++ programs can link to the C implementation.
 2. Give the distribution and import package organization-unique names.
 3. Add the member to `[tool.uv.workspace].members` if it is outside the existing glob.
 4. Declare workspace dependencies normally and add their sources to `[tool.uv.sources]`.
-5. Add the project path to `scripts/check_python.py`.
-6. Run `uv lock`, then the Python quality and test commands.
+5. Add the project path to `scripts/check_python.py` for type checking.
+6. Register its path and distribution name in `PROJECT_FILES` in `scripts/check_versions.py`.
+   The manual version setter uses the same list. Set the initial version to the value in `version.txt`.
+7. Add its `project.version` to the `extra-files` list in `tools/release-please/config.json` so
+   automated releases update it too.
+8. Add its import package to the root coverage `source` list and Ruff's `known-first-party` list.
+9. Create component-owned `docs` pages, link their index from `docs/index.md`, and update the
+   component README with a usage example and its absolute published documentation URL.
+10. Run `uv lock`, then the Python quality, version, test, packaging, and documentation checks.
+
+These explicit lists are intentionally small. Update all of them when adding or renaming a
+component; workspace discovery alone does not register release, coverage, or documentation policy.
 
 ## Adding a native package
 
@@ -84,8 +94,40 @@ C++ programs can link to the C implementation.
 4. Apply `monorepo_set_project_options` to production C targets and
    `monorepo_set_cpp_test_options` to CppUTest executables.
 5. Link only to explicitly declared targets and register the test with CTest.
-6. Add the directory to the root `CMakeLists.txt`.
-7. Run the developer, analysis, sanitizer, and coverage presets.
+6. Add install rules for the library, public headers, and the shared `MonorepoTemplateTargets`
+   export. Set `EXPORT_NAME` and build/install include directories like the existing libraries.
+7. Add the directory to the root `CMakeLists.txt`.
+8. Register the installed version header and macro prefix in `scripts/check_native_install.py`.
+   Extend `native/tests/install_consumer` to link and exercise the new library and version header.
+9. Create component-owned `docs` pages and link their index from `docs/index.md`. Add the public
+   include directory to `tools/doxygen/Doxyfile`; generated headers are already discovered from
+   the shared generated include tree.
+10. Run the developer, analysis, sanitizer, and coverage presets, then verify a clean install with
+    the external consumer and build the documentation site.
+
+## Consuming a native installation
+
+Build and install the release artifacts, then configure the example downstream consumer using only
+an installation prefix:
+
+```bash
+cmake --preset release
+cmake --build --preset release
+cmake --install build/release --prefix stage
+cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja \
+  -DCMAKE_PREFIX_PATH="$PWD/stage"
+cmake --build build/install-consumer
+ctest --test-dir build/install-consumer --output-on-failure
+```
+
+Downstream CMake projects use `find_package(MonorepoTemplate CONFIG REQUIRED)` and link the
+`example::core`, `example::package_a`, or `example::package_b` targets. The install tree can be
+moved without changing its generated CMake files.
+
+Package configuration is installed beneath `<libdir>/cmake/MonorepoTemplate`. Consumers that
+previously set `MonorepoTemplate_DIR` directly to `<libdir>/cmake/monorepo-template` must update
+that path. Prefer `CMAKE_PREFIX_PATH` pointing at the installation prefix. Verify upgrades with a
+clean install tree so obsolete configuration files from an older installation do not interfere.
 
 ## Cross-language integration
 
