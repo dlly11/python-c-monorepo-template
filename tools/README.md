@@ -1,8 +1,8 @@
-# Tool configuration
+# Repository tooling and configuration
 
-This directory contains configuration and support files for tools that accept an explicit path
-without weakening their normal developer experience.
+This directory contains the private maintenance package and shared tool configuration.
 
+- [repo_tools/](repo_tools/README.md) provides the `repo-tools` CLI, its source launcher, and tests.
 - `release-please/` contains Release Please's policy and version-state manifest. The release
   workflow passes both paths explicitly.
 - `sphinx/` configures the repository-wide MyST, Mermaid, autodoc, and Breathe documentation site.
@@ -16,13 +16,7 @@ Clang tooling, EditorConfig, Git, pre-commit, uv, and CMake integrations expect 
 filenames in the project or a parent directory. Keeping those entry points at the root lets CLIs,
 editors, and language servers work without repository-specific flags.
 
-## Script support modules
-
-`scripts/repository_metadata.py` discovers uv members and reads shared version/Git metadata.
-`scripts/python_smoke_checks.py` owns the explicit distribution API examples.
-`scripts/github_api.py` provides read-only GitHub transport, and `scripts/github_checks.py` owns
-policy comparison and validation evidence. Executable scripts parse arguments and orchestrate those
-helpers; they do not import other command entry points. Regression tests live in `scripts/tests`.
+## Adding components
 
 Component additions are described in [architecture](../docs/architecture.md#adding-a-python-package).
 Type/version checks discover members automatically; release, coverage, smoke, and documentation

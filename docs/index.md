@@ -12,6 +12,7 @@ testing, versioning, and release automation can be compared without coupling the
 
 architecture
 workstation
+../tools/repo_tools/README
 adopting
 dependencies
 testing

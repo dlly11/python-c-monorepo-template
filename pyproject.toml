@@ -18,6 +18,7 @@ members = [
 ]
 
 [tool.uv.sources]
+monorepo-repo-tools = { path = "tools/repo_tools", editable = true }
 example-core = { workspace = true }
 example-package-a = { workspace = true }
 example-package-b = { workspace = true }
@@ -34,6 +35,7 @@ lint = [
   "ty>=0.0.80",
 ]
 dev = [
+  "monorepo-repo-tools",
   { include-group = "lint" },
   { include-group = "test" },
 ]
@@ -68,10 +70,11 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
-"scripts/**" = ["S603", "S607"]
+"tools/repo_tools/**" = ["S603", "S607"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
+  "repo_tools",
   "example_core",
   "example_package_a",
   "example_package_a_cli",
@@ -85,7 +88,7 @@ docstring-code-format = true
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-testpaths = ["python", "scripts/tests"]
+testpaths = ["python", "tools/repo_tools/tests"]
 addopts = "--import-mode=importlib --strict-config --strict-markers --cov --cov-report=term-missing"
 xfail_strict = true
 

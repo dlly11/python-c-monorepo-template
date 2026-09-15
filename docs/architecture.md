@@ -73,13 +73,13 @@ C++ programs can link to the C implementation.
 3. Add the member to `[tool.uv.workspace].members` if it is outside the existing glob.
 4. Declare workspace dependencies normally and add their sources to `[tool.uv.sources]`.
 5. Set its version to `version.txt`. Type checks, version checks, and the setter discover members
-   from the workspace; no script project lists need updating.
+   from the workspace; no command project lists need updating.
 6. Register `project.version` in Release Please's `extra-files` and add the import package to
    coverage's `source` list and Ruff's `known-first-party` list in the root `pyproject.toml`.
-7. Add a public API smoke example to `SMOKE_CHECKS` in `scripts/python_smoke_checks.py`.
+7. Add a public API smoke example to `SMOKE_CHECKS` in `tools/repo_tools/src/repo_tools/python_smoke_checks.py`.
 8. Create `docs/index.md` with overview, examples, and API reference; link it from `docs/index.md`.
    Retain a distribution README with a short usage example and absolute documentation URL.
-9. Run `uv lock`, `uv run python scripts/check_workspace.py`, and the relevant
+9. Run `uv lock`, `uv run repo-tools check-workspace`, and the relevant
    [local checks](testing.md#local-validation).
 
 The workspace checker expands uv member/exclude globs and discovers distribution names and regular
@@ -105,7 +105,7 @@ existing CMake and install checks; documentation links are validated by the Sphi
 6. Add install rules for the library, public headers, and the shared `MonorepoTemplateTargets`
    export. Set `EXPORT_NAME` and build/install include directories like the existing libraries.
 7. Add the directory to the root `CMakeLists.txt`.
-8. Register the installed version header and macro prefix in `scripts/check_native_install.py`.
+8. Register the installed version header and macro prefix in `tools/repo_tools/src/repo_tools/commands/check_native_install.py`.
    Extend `native/tests/install_consumer` to link and exercise the new library and version header.
 9. Create component-owned `docs` pages and link their index from `docs/index.md`. Add the public
    include directory to `tools/doxygen/Doxyfile`; generated headers are already discovered from

@@ -46,8 +46,7 @@ when dependencies must come from an approved local source.
 │       └── package_a_cli/
 ├── cmake/                       # shared compiler and analysis policy
 ├── docs/                        # repository-wide documentation and Sphinx landing page
-├── scripts/                     # repository-level orchestration
-├── tools/                       # Sphinx, Doxygen, and release tool configuration
+├── tools/                       # private repo-tools package and tool configuration
 ├── CMakeLists.txt               # native build graph
 ├── CMakePresets.json            # dev, analysis, sanitizer, and release builds
 ├── pyproject.toml               # uv workspace and shared Python policy

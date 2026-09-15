@@ -44,6 +44,11 @@ symbols beginning with `acme_`. Keep the component dependency directions describ
 | Executable names | `package-a-cli` | Python entry point and installed CLI checks; native target/output name, CTest, examples, artifact checks |
 | Hosting and owners | `dlly11`, repository URL, Pages URL | README/component links, Sphinx base/source URLs, PR-template link, CODEOWNERS, reuse statement's original-repository link |
 
+The private `monorepo-repo-tools` distribution and `repo_tools` import namespace can keep their
+names when adopting the template. Keep them outside workspace membership, release registrations,
+and product coverage sources; retain `repo_tools` in Ruff’s first-party names. Their private
+version is independent of `version.txt`.
+
 The Python and native CLIs currently share a command name. Use an explicit native build/install path
 when testing both, or choose distinct names in the adopted project.
 
@@ -56,12 +61,12 @@ The shared registrations are intentionally explicit. Review these when renaming,
 a component:
 
 - Root `pyproject.toml`: workspace membership/sources, Ruff import names, and coverage sources.
-- `scripts/python_smoke_checks.py`: `SMOKE_CHECKS`; `scripts/check_python_install.py`: CLI checks. Add one meaningful
+- `tools/repo_tools/src/repo_tools/python_smoke_checks.py`: `SMOKE_CHECKS`; `tools/repo_tools/src/repo_tools/commands/check_python_install.py`: CLI checks. Add one meaningful
   public API example for every independently shipped Python package.
-- `scripts/check_native_install.py`: installed version-header paths and macro prefixes.
+- `tools/repo_tools/src/repo_tools/commands/check_native_install.py`: installed version-header paths and macro prefixes.
 - Root/component CMake files and `native/tests/install_consumer`: targets, exports, installed
   package names, headers, and consumer expectations.
-- Release Please's `extra-files`, Sphinx/Doxygen configuration, toctrees, and script regression
+- Release Please's `extra-files`, Sphinx/Doxygen configuration, toctrees, and tooling regression
   fixtures that contain example component names.
 
 Regenerate workspace metadata after changing declarations:
@@ -69,7 +74,7 @@ Regenerate workspace metadata after changing declarations:
 ```text
 uv lock
 uv sync --locked --all-packages
-uv run python scripts/check_workspace.py
+uv run repo-tools check-workspace
 ```
 
 Do not replace names manually inside `uv.lock` or generated build files. Configure into fresh build
@@ -89,8 +94,8 @@ not become a claim that you own the original repository.
 For a newly created repository with no releases, choose an initial baseline such as `0.1.0` and run:
 
 ```text
-uv run python scripts/set_version.py 0.1.0
-uv run python scripts/check_versions.py
+uv run repo-tools set-version 0.1.0
+uv run repo-tools check-versions
 ```
 
 Set the `"."` value in `tools/release-please/manifest.json` to that same baseline and replace the
@@ -99,7 +104,7 @@ Release Please state, create tags, or publish a release. Subsequent releases use
 [release workflow](releases.md); do not reset version history in an already released fork.
 Configure Pages and required checks using that guide before relying on automation.
 Review `tools/github/repository-policy.json` and run
-`uv run python scripts/check_github_settings.py --repo OWNER/REPO` after configuring the new
+`uv run repo-tools check-github-settings --repo OWNER/REPO` after configuring the new
 repository. The audit reports drift without applying settings; see the release guide for access
 requirements and exit codes. Keep policy and workflow branch/check names aligned when renaming.
 

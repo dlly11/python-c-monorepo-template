@@ -12,10 +12,10 @@ Linux/GCC. Coverage runs the Python and native tests; a separate pytest invocati
 ```bash
 uv run pre-commit run --all-files
 uv sync --locked --all-packages --group coverage --group docs
-uv run --no-sync python scripts/check_versions.py
-uv run --no-sync python scripts/check_python_install.py
-uv run --no-sync python scripts/check_coverage.py
-uv run --no-sync python scripts/build_docs.py
+uv run --no-sync repo-tools check-versions
+uv run --no-sync repo-tools check-python-install
+uv run --no-sync repo-tools check-coverage
+uv run --no-sync repo-tools build-docs
 cmake --preset analysis
 cmake --build --preset analysis
 cmake --build --preset analysis --target format-c-check
@@ -29,7 +29,7 @@ configure/build/CTest presets. The sanitizer preset is unavailable on Windows. F
 also exercise the [installed consumer](architecture.md#consuming-a-native-installation).
 
 For a focused Python change, use `uv run pytest --no-cov PATH_TO_TESTS` during development. Build
-documentation with `uv run --group docs python scripts/build_docs.py` and open
+documentation with `uv run --group docs repo-tools build-docs` and open
 `build/docs/html/index.html`; Sphinx and Doxygen warnings fail the build.
 
 ## PR and post-merge responsibilities
@@ -95,10 +95,10 @@ The Python quality job builds wheels and source distributions, then checks every
 temporary environment. Run the same check locally:
 
 ```bash
-uv run python scripts/check_python_install.py
+uv run repo-tools check-python-install
 ```
 
-The script uses a fresh artifact directory and checks distribution names and versions before
+The command uses a fresh artifact directory and checks distribution names and versions before
 installing. Each environment receives only its target wheel and declared dependencies. Local wheel
 constraints ensure sibling dependencies come from this build without installing unrelated members.
 Third-party runtime dependencies use the installer's configured indexes; the current example has
@@ -114,16 +114,24 @@ API/CLI checks time out after ten seconds; uv build/install commands after five 
 Failures report the package and command output and return a nonzero exit status. Temporary build
 artifacts and environments are removed on both success and failure.
 
-Add a `SMOKE_CHECKS` entry in `scripts/python_smoke_checks.py` when introducing a Python distribution. These checks cover
-the exercised install/API paths; the ordinary component tests remain responsible for deeper behavior.
+The same command separately builds and installs the private `repo-tools` package. Its smoke checks
+verify console and module help outside the checkout and a version check against an explicit target.
+The tooling wheel uses its own version and artifact directory.
+
+Add a `SMOKE_CHECKS` entry in
+[python_smoke_checks.py](../tools/repo_tools/src/repo_tools/python_smoke_checks.py) when introducing
+a product distribution. These checks cover the exercised install/API paths; the ordinary component
+tests remain responsible for deeper behavior.
 CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
 version test matrix. The release workflow continues to build the same distribution formats.
 
 To smoke-test already-built release wheels without rebuilding them, run
-`uv run python scripts/check_python_install.py --dist dist`. Release CI uses this mode before
-uploading the exact wheels it checked. Use `--project-root CHECKOUT` to select version metadata
-and build/index configuration from another checkout; see [asset recovery](releases.md#recovering-missing-release-assets). This validates the published artifacts while the full
-unit-test and analysis suite remains on PRs.
+`uv run repo-tools check-python-install --dist dist`. Release CI uses this mode before
+uploading the exact wheels it checked. This mode checks product artifacts only and does not build
+or install private tooling. Put `--project-root CHECKOUT` before `check-python-install` to select
+version metadata and build/index configuration from another checkout; see
+[asset recovery](releases.md#recovering-missing-release-assets). This validates the published artifacts
+while the full unit-test and analysis suite remains on PRs.
 
 ## Native unit tests
 
@@ -143,14 +151,14 @@ Each first-party native CTest test, including the installed consumer, has a 60-s
 limit. The CLI output-comparison helper additionally stops its child process after ten seconds
 and reports the executable and limit. These limits apply to local builds and CI.
 
-## Repository script tests
+## Private tooling tests
 
 Workflow regression tests mock GitHub API reads to verify release eligibility, stale/pending/failed
 CI handling, manual and fork PR-title context, and GitHub policy drift. They run in the existing
 pytest suite without network access or additional CI jobs. Live settings audits are manual and
 read-only; see [the release guide](releases.md).
 
-The normal `uv run pytest` command also discovers `scripts/tests`. These tests cover version
+The normal `uv run pytest` command also discovers `tools/repo_tools/tests`. These tests cover version
 validation, version-update rollback, native install validation, commit/PR-title syntax, wheel isolation,
 workspace registration consistency, and workstation diagnostics. Temporary-workspace tests cover
 added/removed/renamed members, exclusions, duplicate names, namespace drift, and incorrect release
@@ -161,8 +169,11 @@ files and mocked subprocesses where appropriate. The
 wheel-isolation regression installs tiny fixture wheels with uv in offline mode; it checks that an
 undeclared dependency fails even when its source is available on `PYTHONPATH`. That regression skips
 when uv is unavailable; normal development and CI runs provide uv.
-Script tests do not access the network or change committed metadata.
-Coverage thresholds continue to measure production packages rather than orchestration scripts.
+Tooling tests do not access the network or change committed metadata. They also exercise checkout
+discovery, explicit target roots, the source launcher without site-packages, and the private
+package’s exclusion from product version updates.
+Coverage thresholds continue to measure the four product packages; the private tooling is
+linted, type-checked, and tested in the existing jobs.
 
 ## Coverage policy
 
@@ -186,7 +197,7 @@ Install Python 3.12, uv, CMake, Ninja, GCC, and gcov, then run:
 
 ```bash
 uv sync --locked --all-packages --group coverage
-uv run --group coverage python scripts/check_coverage.py
+uv run --group coverage repo-tools check-coverage
 ```
 
 The command first checks that required tools are available. Missing prerequisites return a failure
@@ -221,7 +232,7 @@ test or threshold fails, when enough data was generated to create them.
 
 ## Native release smoke checks
 
-`python scripts/check_native_install.py PREFIX` validates the version headers and runs the exact
+`python tools/repo_tools/run.py check-native-install PREFIX` validates the version headers and runs the exact
 installed CLI for `--version` and a greeting. Missing executables, nonzero exits, unexpected output,
 and ten-second execution timeouts fail the check. The command must run on the target platform.
 

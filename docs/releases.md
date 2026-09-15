@@ -25,13 +25,13 @@ generated headers, and CI checks their string and numeric macros against `versio
 Run the consistency check locally with:
 
 ```bash
-uv run python scripts/check_versions.py
+uv run repo-tools check-versions
 ```
 
 For an exceptional manual version change, use the repository command rather than editing files:
 
 ```bash
-uv run python scripts/set_version.py 1.2.3
+uv run repo-tools set-version 1.2.3
 ```
 
 Normal releases must go through Release Please. The manual command does not create release notes,
@@ -216,9 +216,9 @@ zero required approvals and permits squash, merge, and rebase integrations.
 With an authenticated GitHub CLI, run the read-only audit manually:
 
 ```bash
-uv run python scripts/check_github_settings.py
+uv run repo-tools check-github-settings
 # Or target a repository explicitly, including a newly adopted template:
-uv run python scripts/check_github_settings.py --repo OWNER/REPO
+uv run repo-tools check-github-settings --repo OWNER/REPO
 ```
 
 Without `--repo`, the command uses `gh repo view` to detect the checkout's repository. Reading
@@ -265,14 +265,14 @@ git fetch origin tag "${RELEASE_TAG}"
 git worktree add --detach ../release-recovery "${RELEASE_TAG}"
 RELEASE_ROOT=$(cd ../release-recovery && pwd)
 cd "${RELEASE_ROOT}"
-python scripts/check_versions.py --tag "${RELEASE_TAG}"
+python "${TOOLING_ROOT}/tools/repo_tools/run.py" --project-root "${RELEASE_ROOT}" check-versions --tag "${RELEASE_TAG}"
 ```
 
 For a missing Python distribution:
 
 ```bash
 uv build --all-packages --out-dir dist
-python "${TOOLING_ROOT}/scripts/check_python_install.py" --project-root "${RELEASE_ROOT}" --dist "${RELEASE_ROOT}/dist"
+python "${TOOLING_ROOT}/tools/repo_tools/run.py" --project-root "${RELEASE_ROOT}" check-python-install --dist "${RELEASE_ROOT}/dist"
 # Only after every wheel passes; upload only the missing/rebuilt asset; replace this example filename as needed.
 gh release upload "${RELEASE_TAG}" dist/example_core-0.4.2-py3-none-any.whl --clobber
 ```
@@ -291,7 +291,7 @@ ARCHIVE="${REPOSITORY_NAME}-${RELEASE_TAG}-${RELEASE_OS}-${RELEASE_ARCH}.zip"
 cmake --preset release
 cmake --build --preset release
 cmake --install build/release --prefix stage
-python "${TOOLING_ROOT}/scripts/check_native_install.py" --project-root "${RELEASE_ROOT}" "${RELEASE_ROOT}/stage"
+python "${TOOLING_ROOT}/tools/repo_tools/run.py" --project-root "${RELEASE_ROOT}" check-native-install "${RELEASE_ROOT}/stage"
 cmake -S "${TOOLING_ROOT}/native/tests/install_consumer" -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${PWD}/stage"
 cmake --build build/release-consumer
 ctest --test-dir build/release-consumer --output-on-failure

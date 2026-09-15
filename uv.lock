@@ -687,6 +687,11 @@ wheels = [
 ]
 
 [[package]]
+name = "monorepo-repo-tools"
+version = "0.1.0"
+source = { editable = "tools/repo_tools" }
+
+[[package]]
 name = "myst-parser"
 version = "5.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -806,6 +811,7 @@ coverage = [
     { name = "pytest-cov" },
 ]
 dev = [
+    { name = "monorepo-repo-tools" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -838,6 +844,7 @@ coverage = [
     { name = "pytest-cov", specifier = ">=6.2" },
 ]
 dev = [
+    { name = "monorepo-repo-tools", editable = "tools/repo_tools" },
     { name = "pre-commit", specifier = ">=4.2" },
     { name = "pytest", specifier = ">=8.4" },
     { name = "pytest-cov", specifier = ">=6.2" },

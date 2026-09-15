@@ -33,4 +33,4 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          python scripts/check_pr_title.py --pr "${PR_NUMBER}" --expected-head "${EXPECTED_HEAD}"
+          python tools/repo_tools/run.py check-pr-title --pr "${PR_NUMBER}" --expected-head "${EXPECTED_HEAD}"
