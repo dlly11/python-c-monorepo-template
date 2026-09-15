@@ -22,7 +22,7 @@ that run also does not authorize a release.
 
 Configure branch protection and merge methods using the [release guide](releases.md), then make
 renaming, version, and setup changes on a feature branch. Open a PR and let its full CI and title
-checks pass before merging. This first protected squash or merge commit establishes ordinary post-merge
+checks pass before merging. This first protected PR integration establishes ordinary post-merge
 verification and release automation. Do not bypass the PR requirement to commit setup changes
 directly to main. An initial commit's inherited subject is not retroactively rewritten.
 

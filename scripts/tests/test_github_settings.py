@@ -79,7 +79,7 @@ def test_all_differences_are_reported(
     settings_context: tuple[ModuleType, dict[str, Any]], capsys: pytest.CaptureFixture[str]
 ) -> None:
     module, state = settings_context
-    state["repository"].update(allow_merge_commit=False, allow_rebase_merge=True)
+    state["repository"].update(allow_merge_commit=False, allow_rebase_merge=False)
     assert module.main() == 1
     output = capsys.readouterr().err
     assert "allow_merge_commit" in output and "allow_rebase_merge" in output

@@ -149,25 +149,33 @@ def check_ci_run(
         raise ValueError(f"unsupported PR CI event: {run['event']!r}")
 
 
-def merged_pr(repository: str, commit: str) -> dict[str, Any]:
-    """Require a conventional squash or two-parent merge of one GitHub main PR."""
-    parents = git("show", "--no-patch", "--format=%P", commit, "--").split()
-    if len(parents) not in {1, 2}:
-        raise ValueError(f"{commit}: expected a squash commit or two-parent merge commit")
-    if not check_message(git("show", "--no-patch", "--format=%B", commit, "--"), commit[:12]):
-        raise ValueError("merged commit subject is not conventional")
-    candidates = items(f"repos/{repository}/commits/{commit}/pulls?per_page=100")
-    candidates = [
+def associated_prs(repository: str, commit: str) -> list[dict[str, Any]]:
+    """Find merged GitHub PRs that introduced a commit to main."""
+    return [
         pr
-        for pr in candidates
+        for pr in items(f"repos/{repository}/commits/{commit}/pulls?per_page=100")
         if pr.get("merged_at")
-        and pr.get("merge_commit_sha") == commit
         and pr["base"]["ref"] == "main"
         and pr["base"]["repo"]["full_name"] == repository
     ]
-    if len(candidates) != 1:
-        raise ValueError(f"{commit}: expected exactly one merged PR targeting main")
+
+
+def merged_pr(repository: str, commit: str) -> tuple[dict[str, Any], list[str]]:
+    """Validate a PR's final commit and return its first-parent integration, oldest first."""
+    parents = git("show", "--no-patch", "--format=%P", commit, "--").split()
+    if len(parents) not in {1, 2}:
+        raise ValueError(f"{commit}: expected a one-parent commit or two-parent merge commit")
+    if not check_message(git("show", "--no-patch", "--format=%B", commit, "--"), commit[:12]):
+        raise ValueError("merged commit subject is not conventional")
+    candidates = associated_prs(repository, commit)
+    if len(candidates) != 1 or candidates[0].get("merge_commit_sha") != commit:
+        raise ValueError(
+            f"{commit}: expected exactly one merged PR targeting main at its final commit"
+        )
     pr = api(f"repos/{repository}/pulls/{candidates[0]['number']}")
+    if pr.get("merge_commit_sha") != commit:
+        raise ValueError(f"{commit}: merged PR final commit changed during verification")
+    integration = [commit]
     if len(parents) == 2:
         if parents[1] != pr["head"]["sha"]:
             raise ValueError(f"{commit}: merge second parent does not match the PR head")
@@ -177,7 +185,27 @@ def merged_pr(repository: str, commit: str) -> dict[str, Any]:
         for sha in introduced:
             if not check_message(git("show", "--no-patch", "--format=%B", sha, "--"), sha[:12]):
                 raise ValueError("merged PR commit subject is not conventional")
-    return pr
+    else:
+        # GitHub records the last rebased SHA as merge_commit_sha. Its commit-to-PR
+        # endpoint identifies the preceding rewritten commits, without relying on
+        # original SHAs, commit counts, messages, or patch equivalence to infer membership.
+        parent = parents[0]
+        while True:
+            preceding = associated_prs(repository, parent)
+            if not any(candidate["number"] == pr["number"] for candidate in preceding):
+                break
+            if len(preceding) != 1 or preceding[0].get("merge_commit_sha") != commit:
+                raise ValueError(f"{parent}: ambiguous rebased PR association")
+            parents = git("show", "--no-patch", "--format=%P", parent, "--").split()
+            if len(parents) != 1:
+                raise ValueError(f"{parent}: rebased PR commits must each have one parent")
+            if not check_message(
+                git("show", "--no-patch", "--format=%B", parent, "--"), parent[:12]
+            ):
+                raise ValueError("rebased PR commit subject is not conventional")
+            integration.append(parent)
+            parent = parents[0]
+    return pr, list(reversed(integration))
 
 
 def required_ci_jobs() -> set[str]:
@@ -224,9 +252,9 @@ def check_evidence(
             raise ValueError(f"CI run {run_id}: validation {key} does not match the commit/run")
 
 
-def verify_commit(repository: str, commit: str, required: set[str], workflow_id: int) -> None:
-    """Bind one merged tree to a successful PR run and all required CI jobs."""
-    pr = merged_pr(repository, commit)
+def verify_commit(repository: str, commit: str, required: set[str], workflow_id: int) -> list[str]:
+    """Bind a PR's final tree to successful CI and return its integrated first-parent commits."""
+    pr, integration = merged_pr(repository, commit)
     query = urlencode({"head_sha": pr["head"]["sha"], "per_page": 100})
     endpoint = f"repos/{repository}/actions/workflows/{workflow_id}/runs?{query}"
 
@@ -250,3 +278,4 @@ def verify_commit(repository: str, commit: str, required: set[str], workflow_id:
     if newest_run_id() != run["id"]:
         raise ValueError("a newer PR CI run started during merge verification")
     print(f"Verified {commit[:12]} matches PR #{pr['number']}'s tested tree, CI run {run['id']}.")
+    return integration

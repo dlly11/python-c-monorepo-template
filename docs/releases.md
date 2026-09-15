@@ -52,7 +52,8 @@ the older compatible version.
 
 Release Please derives the next version and changelog from commits on `main`. This template
 validates both new commit subjects and pull request titles. GitHub's squash and merge commit
-defaults use the validated PR title as the resulting commit subject on `main`.
+defaults use the validated PR title as the resulting commit subject on `main`. Rebase merges
+preserve the individual commit messages instead; the PR title is still checked for review clarity.
 
 | Conventional subject | Version effect |
 | --- | --- |
@@ -68,12 +69,15 @@ in [testing](testing.md#pr-and-post-merge-responsibilities). Bootstrap pushes sk
 Squashing produces one commit per PR. Creating a merge commit preserves the individual commits
 as well, so their release signals and changelog entries can contribute to the release. For example,
 a preserved `feat:` commit can request a minor release even if the PR title starts with `fix:`.
-Review the generated release PR before merging it. Both methods are supported for release PRs;
-rebase merging is disabled.
+Rebase merging also preserves individual messages, with new SHAs and no additional merge commit.
+A PR title alone cannot request a version bump or add a breaking-change marker to rebased commits.
+Review the generated release PR before merging it. Release readiness and evidence recovery support
+all three methods, including a rebased release branch with a separate lockfile-update commit.
 
 For breaking changes, put `!` in the PR title and in the relevant individual commit when preserving
 commits. Explain migration in a `BREAKING CHANGE:` footer in the final commit body. Squash bodies
-default to the commit messages; merge commit bodies default to the PR description. Bodies and
+default to the commit messages; merge commit bodies default to the PR description. With a rebase,
+put release footers in the relevant individual commit: the PR description is not copied. Bodies and
 footers are not linted. For a manual title check, select the open PR's current head branch and number:
 
 ```bash
@@ -147,8 +151,9 @@ The gate requires the latest manual CI run for the exact current main commit, th
 and workflow, every required quality job completed successfully, and a matching validation record
 including the checkout SHA and Git tree. It independently checks the final Conventional Commit
 subject and merged-PR association, plus the second parent and preserved commit subjects for merge
-commits. Skipped jobs, expired/mismatched records, or pending/failed runs reject recovery. The
-separate PR title job is replaced by validation of the actual squash or merge commit subject.
+commits. For a rebase it checks subjects across the contiguous rewritten PR sequence, and main must
+be at the PR's final rewritten commit. Skipped jobs, expired/mismatched records, or pending/failed
+runs reject recovery. Actual integrated commit subjects replace the separate PR title job.
 The gate rechecks the CI run and main after reading evidence; if main advances, start again on the
 new head. Initialization commits without a merged PR cannot use this procedure.
 
@@ -172,22 +177,24 @@ repository created from this template before relying on enforcement or unattende
    `Coverage` includes the Python 3.12 tests; only Python 3.13 and 3.14 need separate required
    compatibility checks.
    **Merged PR verification** runs after merging and must not be a required PR check.
-3. Under **Settings > General > Pull Requests**, enable **Allow squash merging** and **Allow merge
-   commits**, and disable rebase merging. Use the **pull request title** for both commit title
+3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, **Allow merge
+   commits**, and **Allow rebase merging**. Use the **pull request title** for squash and merge title
    defaults (`squash_merge_commit_title: PR_TITLE`, `merge_commit_title: PR_TITLE`), including
    single-commit squash PRs. Use commit messages for squash bodies and the PR description for
    merge bodies (`squash_merge_commit_message: COMMIT_MESSAGES`, `merge_commit_message: PR_BODY`).
    Turn off **Require linear history** on `main` to permit merge commits. Keep the validated
-   subject when confirming either merge method; the UI still permits editing that default,
+   subject when confirming squash or merge commits; the UI still permits editing that default,
    and the push check detects invalid subjects after merging.
 4. Restrict release tag creation to maintainers and the release workflow. Run both workflows on
    a PR before selecting their required check names. The title check belongs to `pr-title.yml`;
    renaming jobs later requires updating the protection settings.
 
-When upgrading an existing squash-only repository, squash-merge the verifier update first. Then
-enable merge commits, configure their title/body defaults, and turn off required linear history
-as above. Run the [settings audit](#audit-the-managed-github-settings) to confirm the transition.
-Enabling the settings before the updated verifier reaches `main` can cause post-merge CI failures.
+When upgrading an existing repository, merge the verifier update using an already supported method
+first. Then enable the additional methods and configure their defaults as above. Run the
+[settings audit](#audit-the-managed-github-settings) to confirm the transition. For a controlled
+first-use test, the update PR itself can use a newly enabled method once all its required checks
+pass: post-merge CI checks out the updated verifier from that PR. Merge this update before using
+the new method on other PRs; the older verifier would reject them.
 
 The workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions. GitHub suppresses
 ordinary workflow events caused by that token, so the release workflow deliberately invokes
@@ -204,7 +211,7 @@ migration.
 `tools/github/repository-policy.json` records the intended default branch, merge defaults, PR
 requirements, required checks and GitHub Actions source IDs, administrator enforcement, and
 linear-history/force-push/deletion settings. It preserves the current solo-maintainer policy with
-zero required approvals, permits squash and merge commits, and keeps rebase merging disabled.
+zero required approvals and permits squash, merge, and rebase integrations.
 
 With an authenticated GitHub CLI, run the read-only audit manually:
 
