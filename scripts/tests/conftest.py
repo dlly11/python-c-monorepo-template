@@ -17,6 +17,7 @@ def scripts(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
             "set_version",
             "check_native_install",
             "check_pr_title",
+            "check_commits",
             "check_python_install",
             "doctor",
             "check_workspace",

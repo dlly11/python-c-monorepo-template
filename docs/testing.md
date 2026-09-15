@@ -49,10 +49,13 @@ empty input. Linux additionally checks that greeting and version output fail whe
 ## Repository script tests
 
 The normal `uv run pytest` command also discovers `scripts/tests`. These tests cover version
-validation, version-update rollback, native install validation, PR-title syntax, wheel isolation,
+validation, version-update rollback, native install validation, commit/PR-title syntax, wheel isolation,
 workspace registration consistency, and workstation diagnostics. Temporary-workspace tests cover
 added/removed/renamed members, exclusions, duplicate names, namespace drift, and incorrect release
-entries. They use temporary files and mocked subprocesses where appropriate. The
+entries. Commit validation tests use real temporary Git repositories to cover introduced ranges,
+legacy history, synthetic PR merges, initial pushes, and unresolved refs. They also cover message
+files, multiline bodies, Windows line endings, and invalid subjects. Other tests use temporary
+files and mocked subprocesses where appropriate. The
 wheel-isolation regression installs tiny fixture wheels with uv in offline mode; it checks that an
 undeclared dependency fails even when its source is available on `PYTHONPATH`. That regression skips
 when uv is unavailable; normal development and CI runs provide uv.

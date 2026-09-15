@@ -186,14 +186,19 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
-Fast file-level Ruff, ty, clang-format, and cppcheck checks run before commits. The full
-compilation-database-aware clang-tidy analysis remains in the CMake analysis preset and CI.
+The install command sets up both `pre-commit` and `commit-msg` hooks. Run it again in existing
+clones to enable commit-message validation. Fast file-level Ruff, ty, clang-format, and cppcheck
+checks run before commits; the message hook requires a Conventional Commit subject such as
+`fix(core): handle empty input`. CI also validates new commit subjects and PR titles. See
+[Contributing](docs/CONTRIBUTING.md) for manual checks and correcting rejected messages.
+The full compilation-database-aware clang-tidy analysis remains in the CMake analysis preset and CI.
 
 ## Versioning and releases
 
 All Python and native components share one Semantic Versioning release number. Native CMake builds
 generate and install a version header for each library and the CLI from that value. Release Please
-uses Conventional Commit pull request titles to maintain a reviewable release pull request,
+uses Conventional Commits on `main`, with squash commit subjects taken from validated PR titles,
+to maintain a reviewable release pull request,
 changelog, `vX.Y.Z` tag, and GitHub Release. The release workflow also attaches Python
 distributions and cross-platform native install archives.
 
