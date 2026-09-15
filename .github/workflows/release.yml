@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - name: Require successful merged PR verification for current main
         id: readiness
@@ -87,7 +87,7 @@ jobs:
         if: steps.release.outputs.prs_created == 'true'
         run: |
           uv lock
-          uv run repo-tools check-versions
+          python tools/repo_tools/run.py check-versions
 
       - name: Commit the refreshed lockfile
         if: steps.release.outputs.prs_created == 'true'
