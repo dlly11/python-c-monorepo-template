@@ -35,8 +35,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_BASE: ${{ github.event.before }}
           COMMIT_HEAD: ${{ github.sha }}
-        run: python scripts/check_merge.py --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
-      - run: python scripts/check_versions.py
+        run: python tools/repo_tools/run.py check-merge --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
+      - run: python tools/repo_tools/run.py check-versions
 
   python-quality:
     name: Python quality
@@ -55,7 +55,7 @@ jobs:
         env:
           COMMIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || format('origin/{0}', github.event.repository.default_branch) }}
           COMMIT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python scripts/check_commits.py --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
+        run: python tools/repo_tools/run.py check-commits --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
@@ -63,13 +63,13 @@ jobs:
       - run: uv run pre-commit run actionlint --all-files
       - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
-      - run: uv run python scripts/check_workspace.py
-      - run: uv run python scripts/check_python.py
-      - run: uv run python scripts/check_versions.py
-      - run: uv run python scripts/check_python_install.py
+      - run: uv run repo-tools check-workspace
+      - run: uv run repo-tools check-python
+      - run: uv run repo-tools check-versions
+      - run: uv run repo-tools check-python-install
       - name: Record tested PR contents
         if: github.event_name != 'push'
-        run: python scripts/check_merge.py --record build/pr-validation/validation.json
+        run: python tools/repo_tools/run.py check-merge --record build/pr-validation/validation.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: github.event_name != 'push'
         with:
@@ -112,7 +112,7 @@ jobs:
           enable-cache: true
           python-version: "3.12"
       - run: uv sync --locked --all-packages --group coverage
-      - run: uv run --group coverage python scripts/check_coverage.py
+      - run: uv run --group coverage repo-tools check-coverage
       - name: Publish coverage summary
         if: always() && hashFiles('build/coverage/reports/summary.md') != ''
         run: cat build/coverage/reports/summary.md >> "${GITHUB_STEP_SUMMARY}"
@@ -140,7 +140,7 @@ jobs:
       - name: Install Doxygen
         run: sudo apt-get update && sudo apt-get install --yes doxygen
       - run: uv sync --locked --all-packages --group docs
-      - run: uv run --group docs python scripts/build_docs.py
+      - run: uv run --group docs repo-tools build-docs
 
   native-build:
     name: Native build (${{ matrix.os }})
@@ -177,7 +177,7 @@ jobs:
       - name: Verify the native install tree
         run: |
           cmake --install build/dev --prefix build/dev/stage
-          python scripts/check_native_install.py build/dev/stage
+          python tools/repo_tools/run.py check-native-install build/dev/stage
           cmake -S native/tests/install_consumer -B build/install-consumer -G Ninja -DMONOREPO_INSTALL_PREFIX="${{ github.workspace }}/build/dev/stage"
           cmake --build build/install-consumer
           ctest --test-dir build/install-consumer --output-on-failure
@@ -187,7 +187,7 @@ jobs:
           cmake --preset release
           cmake --build --preset release
           cmake --install build/release --prefix build/release/stage
-          python scripts/check_native_install.py build/release/stage
+          python tools/repo_tools/run.py check-native-install build/release/stage
           cmake -S native/tests/install_consumer -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${{ github.workspace }}/build/release/stage"
           cmake --build build/release-consumer
           ctest --test-dir build/release-consumer --output-on-failure
