@@ -195,7 +195,11 @@ The full compilation-database-aware clang-tidy analysis remains in the CMake ana
 
 ## Versioning and releases
 
-Release automation waits for successful push CI on the current `main` commit. To audit the
+Full quality checks run on PRs, including release PRs. After merging, one small CI job verifies
+that the merged files match the tested PR, checks the final commit subject, and checks version
+metadata. Python 3.12 tests run in the coverage job; separate compatibility jobs cover 3.13 and
+3.14. Release automation waits for this post-merge verification and builds/smoke-tests the actual
+release artifacts without repeating the full test suite. To audit the
 repository's merge and branch-protection settings against the checked-in policy, run
 `uv run python scripts/check_github_settings.py` with an authenticated GitHub CLI. This read-only
 command is run manually; see [the release guide](docs/releases.md) for setup and retry procedures.

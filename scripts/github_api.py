@@ -42,3 +42,15 @@ def repository_name(value: str | None = None) -> str:
     if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", name) is None:
         raise ValueError(f"expected OWNER/REPO, found {name!r}")
     return name
+
+
+def items(endpoint: str, key: str | None = None) -> list[dict[str, Any]]:
+    """Read every page of an API collection, including endpoints returning arrays."""
+    pages = json.loads(gh("api", "--method", "GET", "--paginate", "--slurp", endpoint))
+    result = []
+    for page in pages:
+        values = page[key] if key is not None else page
+        if not isinstance(values, list) or any(not isinstance(value, dict) for value in values):
+            raise ValueError("GitHub collection response must contain JSON objects")
+        result.extend(values)
+    return result

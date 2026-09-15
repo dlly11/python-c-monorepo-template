@@ -14,8 +14,31 @@ permissions:
   contents: read
 
 jobs:
+  merged-pr:
+    name: Merged PR verification
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify merged contents against successful PR CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_BASE: ${{ github.event.before }}
+          COMMIT_HEAD: ${{ github.sha }}
+        run: python scripts/check_merge.py --base "${COMMIT_BASE}" --head "${COMMIT_HEAD}"
+      - run: python scripts/check_versions.py
+
   python-quality:
     name: Python quality
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -38,15 +61,24 @@ jobs:
       - run: uv run python scripts/check_python.py
       - run: uv run python scripts/check_versions.py
       - run: uv run python scripts/check_python_install.py
+      - name: Record tested PR contents
+        run: python scripts/check_merge.py --record build/pr-validation/validation.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pr-validation
+          path: build/pr-validation/validation.json
+          if-no-files-found: error
+          overwrite: true
 
   python-tests:
     name: Python ${{ matrix.python-version }}
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -60,6 +92,7 @@ jobs:
 
   coverage:
     name: Coverage
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -103,6 +136,7 @@ jobs:
 
   native-build:
     name: Native build (${{ matrix.os }})
+    if: github.event_name != 'push'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -139,6 +173,7 @@ jobs:
 
   native-analysis:
     name: Native static analysis
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -154,6 +189,7 @@ jobs:
 
   sanitizers:
     name: Native sanitizers
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

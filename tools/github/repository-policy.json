@@ -19,7 +19,6 @@
       "checks": [
         {"context": "Python quality", "app_id": 15368},
         {"context": "Conventional PR title", "app_id": 15368},
-        {"context": "Python 3.12", "app_id": 15368},
         {"context": "Python 3.13", "app_id": 15368},
         {"context": "Python 3.14", "app_id": 15368},
         {"context": "Coverage", "app_id": 15368},

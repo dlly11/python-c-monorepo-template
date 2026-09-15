@@ -114,6 +114,35 @@ def test_failure_returns_nonzero_and_removes_temporary_files(
         raise RuntimeError("build failed deliberately")
 
     monkeypatch.setattr(module, "run", fail)
-    assert module.main() == 1
+    assert module.main([]) == 1
     assert "build failed deliberately" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
+
+
+def test_release_mode_checks_supplied_wheels_without_rebuilding(
+    tmp_path: Path, scripts: dict[str, ModuleType], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = scripts["check_python_install"]
+    wheel = write_wheel(tmp_path, "example-core")
+    monkeypatch.setattr(module, "PROJECT_FILES", {Path("core/pyproject.toml"): "example-core"})
+    monkeypatch.setattr(module, "project_metadata", lambda path: ("example-core", "1.2.3"))
+    monkeypatch.setattr(module, "SMOKE_CHECKS", {"example-core": ("example_core", "")})
+    monkeypatch.setattr(module.shutil, "which", lambda _: "uv")
+
+    def no_build(*args: object, **kwargs: object) -> None:
+        pytest.fail("release mode must not rebuild distributions")
+
+    checked = []
+
+    def check(
+        uv: str, name: str, version: str, artifact: Path, constraints: Path, temporary: Path
+    ) -> None:
+        checked.append(artifact)
+        assert artifact == wheel
+        assert wheel.as_uri() in constraints.read_text()
+
+    monkeypatch.setattr(module, "run", no_build)
+    monkeypatch.setattr(module, "check_wheel", check)
+    assert module.main(["--dist", str(tmp_path)]) == 0
+    assert checked == [wheel]
+    assert wheel.exists()

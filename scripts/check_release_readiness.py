@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from github_api import api, repository_name
+from github_api import api, items, repository_name
 
 
 def check_run(run: dict[str, Any], repository: str, sha: str, workflow_id: int) -> None:
@@ -64,6 +64,16 @@ def ready(event_name: str, event: dict[str, Any], repository: str, ref: str, sha
     latest = max(runs, key=lambda candidate: candidate["id"])
     latest = api(f"repos/{repository}/actions/runs/{latest['id']}")
     check_run(latest, repository, sha, workflow_id)
+    jobs = items(
+        f"repos/{repository}/actions/runs/{latest['id']}/jobs?filter=latest&per_page=100", "jobs"
+    )
+    verification = [job for job in jobs if job["name"] == "Merged PR verification"]
+    if (
+        len(verification) != 1
+        or verification[0]["status"] != "completed"
+        or verification[0]["conclusion"] != "success"
+    ):
+        raise ValueError("push CI must contain successful Merged PR verification")
     if api(branch_endpoint)["commit"]["sha"] != sha:
         if automatic:
             print("Skipping release because main advanced during the readiness check.")
