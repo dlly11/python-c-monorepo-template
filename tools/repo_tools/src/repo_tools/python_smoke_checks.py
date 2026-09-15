@@ -1,8 +1,31 @@
-"""Explicit public API examples for independently delivered Python wheels."""
+"""Explicit API and installed command checks for independently delivered Python wheels."""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class SmokeCommand:
+    """An executable in the wheel environment and its expected behavior."""
+
+    executable: str
+    arguments: tuple[str, ...]
+    status: int = 0
+    stdout: str | None = None
+    stderr_contains: str | None = None
+
+
+@dataclass(frozen=True)
+class SmokeCheck:
+    """One distribution's import namespace, API example, and optional CLI cases."""
+
+    namespace: str
+    example: str
+    commands: tuple[SmokeCommand, ...] = ()
+
 
 # Keep one observable API example per independently delivered component.
 SMOKE_CHECKS = {
-    "example-core": (
+    "example-core": SmokeCheck(
         "example_core",
         """
 from example_core import Message, MessageKind, create_message, normalize_name
@@ -12,7 +35,7 @@ assert create_message(kind=MessageKind.GREETING, source="smoke", prefix="Hi", na
 )
 """,
     ),
-    "example-package-a": (
+    "example-package-a": SmokeCheck(
         "example_package_a",
         """
 from example_package_a import GreetingService
@@ -20,7 +43,7 @@ message = GreetingService().greet("Ada")
 assert (message.kind, message.source, message.text) == ("greeting", "package_a", "Hello, Ada!")
 """,
     ),
-    "example-package-b": (
+    "example-package-b": SmokeCheck(
         "example_package_b",
         """
 from example_package_b import FarewellService
@@ -28,12 +51,23 @@ message = FarewellService().farewell("Ada")
 assert (message.kind, message.source, message.text) == ("farewell", "package_b", "Goodbye, Ada!")
 """,
     ),
-    "example-package-a-cli": (
+    "example-package-a-cli": SmokeCheck(
         "example_package_a_cli",
         """
 from example_package_a_cli.cli import build_parser
 assert build_parser().parse_args(["Ada"]).name == "Ada"
 """,
+        commands=(
+            SmokeCommand("package-a-cli", ("Ada",), stdout="Hello, Ada!\n"),
+            SmokeCommand("package-a-cli", ("Ada", "--prefix", "Welcome"), stdout="Welcome, Ada!\n"),
+            SmokeCommand(
+                "package-a-cli",
+                ("   ",),
+                status=2,
+                stdout="",
+                stderr_contains="name must contain at least one non-whitespace character",
+            ),
+        ),
     ),
 }
 

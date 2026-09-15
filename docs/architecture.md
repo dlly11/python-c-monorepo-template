@@ -76,7 +76,8 @@ C++ programs can link to the C implementation.
    from the workspace; no command project lists need updating.
 6. Register `project.version` in Release Please's `extra-files` and add the import package to
    coverage's `source` list and Ruff's `known-first-party` list in the root `pyproject.toml`.
-7. Add a public API smoke example to `SMOKE_CHECKS` in `tools/repo_tools/src/repo_tools/python_smoke_checks.py`.
+7. Add a `SmokeCheck` to `SMOKE_CHECKS` in `tools/repo_tools/src/repo_tools/python_smoke_checks.py`,
+   with a public API example and `SmokeCommand` cases for any installed CLI.
 8. Create `docs/index.md` with overview, examples, and API reference; link it from `docs/index.md`.
    Retain a distribution README with a short usage example and absolute documentation URL.
 9. Run `uv lock`, `uv run repo-tools check-workspace`, and the relevant

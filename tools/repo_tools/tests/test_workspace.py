@@ -9,6 +9,7 @@ import pytest
 
 from repo_tools import cli
 from repo_tools.commands import check_workspace
+from repo_tools.python_smoke_checks import SmokeCheck
 from repo_tools.repository_metadata import discover_members
 
 
@@ -83,7 +84,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleTy
     monkeypatch.setattr(
         module,
         "SMOKE_CHECKS",
-        {"sample-core": ("sample_core", ""), "sample-app": ("sample_app", "")},
+        {"sample-core": SmokeCheck("sample_core", ""), "sample-app": SmokeCheck("sample_app", "")},
     )
     return module, tmp_path
 

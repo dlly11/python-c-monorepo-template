@@ -5,6 +5,7 @@ import hashlib
 import os
 import shutil
 import sys
+from dataclasses import replace
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -12,10 +13,17 @@ import pytest
 
 from repo_tools import cli
 from repo_tools.commands import check_python_install
+from repo_tools.python_smoke_checks import SMOKE_CHECKS, SmokeCheck
 
 
 def write_wheel(
-    directory: Path, name: str, *, version: str = "1.2.3", requires: str = "", code: str = ""
+    directory: Path,
+    name: str,
+    *,
+    version: str = "1.2.3",
+    requires: str = "",
+    code: str = "",
+    entry_points: str = "",
 ) -> Path:
     """Create a small installable wheel without a build backend or network access."""
     namespace = name.replace("-", "_")
@@ -26,6 +34,8 @@ def write_wheel(
         f"{info}/METADATA": f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n{requires}",
         f"{info}/WHEEL": "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     }
+    if entry_points:
+        files[f"{info}/entry_points.txt"] = entry_points
     records = []
     for path, content in files.items():
         data = content.encode()
@@ -73,7 +83,9 @@ def test_install_uses_only_declared_dependencies(
     monkeypatch.setitem(
         module.SMOKE_CHECKS,
         "example-package-a",
-        ("example_package_a", 'from example_package_a import message\nassert message == "Hello"'),
+        SmokeCheck(
+            "example_package_a", 'from example_package_a import message\nassert message == "Hello"'
+        ),
     )
     monkeypatch.setenv("UV_OFFLINE", "1")
     monkeypatch.setenv("UV_NO_CONFIG", "1")
@@ -132,7 +144,7 @@ def test_release_mode_checks_supplied_wheels_without_rebuilding(
         module, "python_projects", lambda root: {Path("core/pyproject.toml"): "example-core"}
     )
     monkeypatch.setattr(module, "project_metadata", lambda root, path: ("example-core", "1.2.3"))
-    monkeypatch.setattr(module, "SMOKE_CHECKS", {"example-core": ("example_core", "")})
+    monkeypatch.setattr(module, "SMOKE_CHECKS", {"example-core": SmokeCheck("example_core", "")})
     monkeypatch.setattr(module.shutil, "which", lambda _: "uv")
 
     def no_build(*args: object, **kwargs: object) -> None:
@@ -189,7 +201,7 @@ def test_install_discovers_selected_project_configuration(
     monkeypatch.setitem(
         module.SMOKE_CHECKS,
         "example-core",
-        ("example_core", 'from example_core import message\nassert message == "Private"'),
+        SmokeCheck("example_core", 'from example_core import message\nassert message == "Private"'),
     )
     for variable in ("UV_NO_CONFIG", "UV_FIND_LINKS", "UV_CONFIG_FILE"):
         monkeypatch.delenv(variable, raising=False)
@@ -213,3 +225,81 @@ def test_hanging_smoke_command_times_out_with_output(
             env=dict(os.environ),
             timeout=1,
         )
+
+
+@pytest.mark.parametrize("problem", [None, "missing_entrypoint", "wrong_output", "wrong_status"])
+def test_renamed_distribution_and_cli_retain_registered_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str | None
+) -> None:
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv is needed for the offline installation regression")
+    smoke = SMOKE_CHECKS["example-package-a-cli"]
+    monkeypatch.setitem(
+        check_python_install.SMOKE_CHECKS,
+        "renamed-app",
+        replace(
+            smoke,
+            namespace="renamed_app",
+            example="",
+            commands=tuple(replace(case, executable="renamed-cli") for case in smoke.commands),
+        ),
+    )
+    code = (
+        "import sys\n"
+        "def main():\n"
+        "    name = sys.argv[1]\n"
+        "    if not name.strip():\n"
+        '        print("name must contain at least one non-whitespace character", '
+        "file=sys.stderr)\n"
+        f"        return {5 if problem == 'wrong_status' else 2}\n"
+        '    prefix = sys.argv[3] if len(sys.argv) > 2 else "Hello"\n'
+        + (
+            '    print("incorrect greeting")\n'
+            if problem == "wrong_output"
+            else '    print(f"{prefix}, {name}!")\n'
+        )
+    )
+    wheel = write_wheel(
+        tmp_path,
+        "renamed-app",
+        code=code,
+        entry_points=""
+        if problem == "missing_entrypoint"
+        else "[console_scripts]\nrenamed-cli = renamed_app:main\n",
+    )
+    constraints = tmp_path / "constraints.txt"
+    constraints.touch()
+    monkeypatch.setenv("UV_OFFLINE", "1")
+    monkeypatch.setenv("UV_NO_CONFIG", "1")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
+    # The checks must use installed entry points independently of PATH.
+    monkeypatch.setenv("PATH", "")
+    if problem is None:
+        check_python_install.check_wheel(uv, "renamed-app", "1.2.3", wheel, constraints, tmp_path)
+    else:
+        with pytest.raises((OSError, RuntimeError), match="renamed-cli"):
+            check_python_install.check_wheel(
+                uv, "renamed-app", "1.2.3", wheel, constraints, tmp_path
+            )
+
+
+def test_private_tooling_checks_are_selected_explicitly_after_a_distribution_rename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = check_python_install
+    project = tmp_path / "tools/repo_tools/pyproject.toml"
+    project.parent.mkdir(parents=True)
+    project.write_text('[project]\nname = "renamed-tools"\nversion = "0.1.0"\n', encoding="utf-8")
+    dist = tmp_path / "tooling-dist"
+    dist.mkdir()
+    write_wheel(dist, "renamed-tools", version="0.1.0")
+    commands = []
+    monkeypatch.setattr(module, "run", lambda command, **kwargs: commands.append(command))
+    module.check_tooling("uv", tmp_path, tmp_path)
+    bin_directory = tmp_path / "renamed-tools" / ("Scripts" if os.name == "nt" else "bin")
+    executable = str(bin_directory / ("repo-tools.exe" if os.name == "nt" else "repo-tools"))
+    python = str(bin_directory / ("python.exe" if os.name == "nt" else "python"))
+    assert [executable, "--help"] in commands
+    assert [python, "-I", "-m", "repo_tools", "--help"] in commands
+    assert [executable, "--project-root", str(tmp_path), "check-versions"] in commands

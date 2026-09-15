@@ -61,8 +61,10 @@ The shared registrations are intentionally explicit. Review these when renaming,
 a component:
 
 - Root `pyproject.toml`: workspace membership/sources, Ruff import names, and coverage sources.
-- `tools/repo_tools/src/repo_tools/python_smoke_checks.py`: `SMOKE_CHECKS`; `tools/repo_tools/src/repo_tools/commands/check_python_install.py`: CLI checks. Add one meaningful
-  public API example for every independently shipped Python package.
+- `tools/repo_tools/src/repo_tools/python_smoke_checks.py`: each `SMOKE_CHECKS` entry owns its
+  distribution's import namespace, public API example, and installed CLI cases. Update the registry
+  key and executable names together when renaming an application. Add one meaningful public API
+  example for every independently shipped Python package.
 - `tools/repo_tools/src/repo_tools/commands/check_native_install.py`: installed version-header paths and macro prefixes.
 - Root/component CMake files and `native/tests/install_consumer`: targets, exports, installed
   package names, headers, and consumer expectations.

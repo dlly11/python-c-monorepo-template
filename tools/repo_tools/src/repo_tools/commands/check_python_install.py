@@ -12,7 +12,7 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-from repo_tools.python_smoke_checks import INSTALL_CHECK, SMOKE_CHECKS
+from repo_tools.python_smoke_checks import INSTALL_CHECK, SMOKE_CHECKS, SmokeCheck, SmokeCommand
 from repo_tools.repository_metadata import normalized_name, project_metadata, python_projects
 
 
@@ -82,7 +82,7 @@ def check_wheel(
     temporary: Path,
     project_root: Path | None = None,
     *,
-    smoke: tuple[str, str] | None = None,
+    smoke: SmokeCheck | None = None,
 ) -> None:
     """Install only this wheel and its declared dependencies, then exercise it."""
     env = dict(os.environ)
@@ -103,42 +103,22 @@ def check_wheel(
         env=env,
     )
     run([uv, "pip", "check", "--python", python], cwd=temporary, env=env)
-    namespace, example = SMOKE_CHECKS[name] if smoke is None else smoke
+    smoke = SMOKE_CHECKS[name] if smoke is None else smoke
     run(
-        [python, "-I", "-c", INSTALL_CHECK + example, name, namespace, version],
+        [python, "-I", "-c", INSTALL_CHECK + smoke.example, name, smoke.namespace, version],
         cwd=temporary,
         env=env,
         timeout=10,
     )
-    if name == "example-package-a-cli":
-        executable = str(
-            bin_directory / ("package-a-cli.exe" if os.name == "nt" else "package-a-cli")
-        )
-        run([executable, "Ada"], cwd=temporary, env=env, stdout="Hello, Ada!\n", timeout=10)
+    for command in smoke.commands:
+        executable = bin_directory / (command.executable + (".exe" if os.name == "nt" else ""))
         run(
-            [executable, "Ada", "--prefix", "Welcome"],
+            [str(executable), *command.arguments],
             cwd=temporary,
             env=env,
-            stdout="Welcome, Ada!\n",
-            timeout=10,
-        )
-        run(
-            [executable, "   "],
-            cwd=temporary,
-            env=env,
-            status=2,
-            stdout="",
-            stderr_contains="name must contain at least one non-whitespace character",
-            timeout=10,
-        )
-    elif name == "monorepo-repo-tools":
-        executable = str(bin_directory / ("repo-tools.exe" if os.name == "nt" else "repo-tools"))
-        run([executable, "--help"], cwd=temporary, env=env, timeout=10)
-        run([python, "-I", "-m", "repo_tools", "--help"], cwd=temporary, env=env, timeout=10)
-        run(
-            [executable, "--project-root", str(project_root), "check-versions"],
-            cwd=temporary,
-            env=env,
+            status=command.status,
+            stdout=command.stdout,
+            stderr_contains=command.stderr_contains,
             timeout=10,
         )
 
@@ -165,9 +145,14 @@ def check_tooling(uv: str, project_root: Path, temporary: Path) -> None:
         constraints,
         temporary,
         project_root,
-        smoke=(
+        smoke=SmokeCheck(
             "repo_tools",
             "from repo_tools.cli import build_parser\nassert build_parser().prog == 'repo-tools'\n",
+            commands=(
+                SmokeCommand("repo-tools", ("--help",)),
+                SmokeCommand("python", ("-I", "-m", "repo_tools", "--help")),
+                SmokeCommand("repo-tools", ("--project-root", str(project_root), "check-versions")),
+            ),
         ),
     )
 
