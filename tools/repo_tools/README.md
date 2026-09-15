@@ -74,4 +74,4 @@ Package-level modules contain shared helpers. Update the relevant workflow guide
 user-facing operation; CLI help remains the reference for command options.
 
 See the [workstation guide](../../docs/workstation.md), [testing guide](../../docs/testing.md), and
-[release guide](../../docs/releases.md) for workflows. CLI help is the reference for command options.
+[release guide](../../docs/releases.md) for workflows.

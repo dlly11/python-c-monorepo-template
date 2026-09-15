@@ -9,13 +9,23 @@ from typing import Literal
 from repo_tools.repository_metadata import discover_members, read_project
 
 _IMPORT_LOCATIONS = """
+import importlib.machinery
 import importlib.util
 import json
 import sys
 
 locations = {}
 for name in json.loads(sys.argv[1]):
-    spec = importlib.util.find_spec(name)
+    parts = name.split('.')
+    spec = importlib.util.find_spec(parts[0])
+    for index in range(1, len(parts)):
+        if spec is None or spec.submodule_search_locations is None:
+            spec = None
+            break
+        # Looking up a dotted name with util.find_spec would import its parent.
+        spec = importlib.machinery.PathFinder.find_spec(
+            '.'.join(parts[:index + 1]), spec.submodule_search_locations
+        )
     locations[name] = spec.origin if spec is not None else None
 print(json.dumps(locations))
 """
@@ -33,7 +43,11 @@ def check_environment(root: Path, *, group: Literal["docs", "coverage"], command
     }
     if (root / "tools/repo_tools/pyproject.toml").is_file():
         sources["repo_tools"] = (root / "tools/repo_tools/src/repo_tools/__init__.py").resolve()
-    modules = ["sphinx"] if group == "docs" else ["pytest", "pytest_cov", "gcovr"]
+    modules = (
+        ["sphinx", "breathe", "myst_parser", "sphinxcontrib.mermaid", "furo"]
+        if group == "docs"
+        else ["pytest", "pytest_cov", "gcovr"]
+    )
     try:
         result = subprocess.run(
             [sys.executable, "-I", "-c", _IMPORT_LOCATIONS, json.dumps([*sources, *modules])],
