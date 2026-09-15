@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.5.0...v0.6.0) (2026-09-15)
+
+
+### Features
+
+* **ci:** support GitHub rebase merges ([#22](https://github.com/dlly11/python-c-monorepo-template/issues/22)) ([482d7be](https://github.com/dlly11/python-c-monorepo-template/commit/482d7be9032243a23829b6437bf27a2c1379b4b3))
+* **ci:** verify GitHub rebase integrations against PR evidence ([e0cca15](https://github.com/dlly11/python-c-monorepo-template/commit/e0cca15076a074100497c5e55b47293836820f90))
+
 ## [0.5.0](https://github.com/dlly11/python-c-monorepo-template/compare/v0.4.5...v0.5.0) (2026-09-15)
 
 
