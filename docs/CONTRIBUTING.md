@@ -32,11 +32,50 @@ ctest --preset analysis
 The combined coverage command requires Linux and GCC. On macOS or Windows, run the other relevant
 checks locally and rely on the existing Linux coverage job for that workflow.
 
-Use a Conventional Commit pull request title such as `feat(package-a): add JSON output`; the
-repository assumes squash merges and Release Please uses the resulting commit to calculate the
-next version. PR-title edits rerun the separate title check without rerunning the build matrix.
+## Commit messages and pull requests
+
+Use a Conventional Commit subject for every new commit and the PR title, for example
+`feat(package-a): add JSON output`. Install both local hooks after synchronizing the workspace:
+
+```bash
+uv run pre-commit install
+```
+
+Run this again in existing clones: installing only the earlier `pre-commit` hook does not install
+the new `commit-msg` hook. The message hook checks the first line, sharing the same policy as the
+PR-title validator. Bodies and footers remain free-form. File checks run at the `pre-commit` stage.
+
+Manual checks:
+
+```bash
+uv run python scripts/check_pr_title.py "feat(package-a): add JSON output"
+uv run python scripts/check_commits.py --message-file .git/COMMIT_EDITMSG
+git fetch origin
+uv run python scripts/check_commits.py --base origin/main --head HEAD
+```
+
+`pre-commit run --all-files` runs file checks; it does not check a commit message. To exercise the
+message hook directly, use
+`uv run pre-commit run conventional-commit --hook-stage commit-msg --commit-msg-filename .git/COMMIT_EDITMSG`.
+
+If a new commit is rejected, correct its subject and retry. For the latest existing commit, use
+`git commit --amend -m "fix(core): handle empty input"`. For older commits on your PR branch, use
+`git rebase -i origin/main` and mark the affected commits `reword`; resolve any `fixup!` or `squash!`
+commits before submitting. Rebase onto `origin/main` when updating a branch. Default Git merge and
+revert messages also fail the subject policy; supply a subject such as `revert: undo JSON output`.
+After rewriting an already pushed branch, coordinate with anyone using it and push with
+`git push --force-with-lease`.
+
+The **Python quality** CI check validates the commits introduced by a PR even if local hooks were
+skipped. The separate **Conventional PR title** check reruns on title edits without rerunning the
+build matrix. Merge with **Squash and merge**, keeping the validated PR title as the resulting
+commit subject; Release Please uses that commit to calculate the next version. Put `!` in the PR
+title for breaking changes so the marker survives squashing.
+
 The normal pytest command also runs the repository script tests. See [the release guide](releases.md)
-for the allowed types and release process.
+for the allowed types, enforced ranges, GitHub settings, and release process.
+
+## Change requirements
 
 Include tests for observable behaviour. Changes to public Python APIs, C headers, command-line
 interfaces, or persistent formats require an explicit compatibility note in the pull request and

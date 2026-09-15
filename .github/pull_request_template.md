@@ -14,4 +14,5 @@
 
 ## Documentation
 
-<!-- Guides/examples updated, or N/A. Follow docs/CONTRIBUTING.md and use a Conventional Commit title. -->
+<!-- Guides/examples updated, or N/A. Follow docs/CONTRIBUTING.md. -->
+<!-- Use Conventional Commit subjects for the PR title and every commit; mark breaking PRs with !. -->

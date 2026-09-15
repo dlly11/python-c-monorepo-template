@@ -143,7 +143,9 @@ uv run --group docs python scripts/build_docs.py
 ```
 
 On Linux, also synchronize the `coverage` group and follow the [coverage guide](testing.md).
-Install commit hooks with `uv run pre-commit install` after the analysis tools are available.
+Install both the `pre-commit` and `commit-msg` hooks with `uv run pre-commit install` after the
+analysis tools are available. Existing clones must rerun this command to add the message hook.
+See [Contributing](CONTRIBUTING.md) for the Conventional Commit policy and repair commands.
 
 ## Understanding doctor output
 

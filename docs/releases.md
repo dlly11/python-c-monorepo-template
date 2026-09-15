@@ -44,7 +44,8 @@ the older compatible version.
 ## Conventional Commits
 
 Release Please derives the next version and changelog from commits on `main`. This template
-expects squash merges and validates pull request titles as Conventional Commit subjects.
+validates both new commit subjects and pull request titles, and uses squash merges to turn each
+validated PR title into the commit subject on `main`.
 
 | Pull request title | Version effect |
 | --- | --- |
@@ -53,9 +54,32 @@ expects squash merges and validates pull request titles as Conventional Commit s
 | `feat(core)!: replace the result API` | Major (`1.2.3` to `2.0.0`) |
 | `docs: explain local builds` | Included in history but does not initiate a release |
 
-The supported title types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
-`revert`, `style`, and `test`. Use a `BREAKING CHANGE:` footer when the title alone cannot explain
-a breaking change.
+The subject format is `type(scope)!: description`, with the scope and `!` optional. Supported
+types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and
+`test`. Types and scopes are lowercase; scopes start with a letter or digit and may contain
+letters, digits, `.`, `_`, `/`, and `-`. Descriptions must be nonempty, stay on one line, and have
+no leading/trailing whitespace or control characters. This is the repository's chosen subset of
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+For breaking changes, put `!` in the PR title and explain the migration in a `BREAKING CHANGE:`
+footer in the final squash commit body. Commit bodies and footers are not linted. The subject
+marker preserves the release signal even if the squash body is edited.
+
+`scripts/conventional_commits.py` holds the shared subject policy. The local `commit-msg` hook
+calls `scripts/check_commits.py`; the **Python quality** CI job calls it for these ranges:
+
+| CI event | Commits checked |
+| --- | --- |
+| Pull request | PR head commits not reachable from the event's base SHA; excludes GitHub's synthetic merge |
+| Push to `main` | Commits introduced between the push's before and after SHAs |
+| Manual dispatch, including release PRs | Selected branch commits not reachable from `origin/main` |
+
+CI fetches full history for this job and fails if a required revision cannot be resolved. Existing
+history is not rewritten or revalidated by ordinary PR/push checks. A branch-creation push with an
+all-zero before SHA checks the whole introduced history, including the root commit. A manual run
+on `main` has no new commits to check. All commits within the selected range must conform,
+including merge commits; default merge/revert messages and temporary `fixup!` subjects do not pass.
+See [Contributing](CONTRIBUTING.md) for hook installation and message repair commands.
 
 The separate `PR title` workflow runs the **Conventional PR title** check on PR creation, reopening,
 new commits, and edits. It reads the current title, so fixing a title also fixes its check without
@@ -89,16 +113,25 @@ and choosing an artifact registry.
 
 ## GitHub repository settings
 
-Configure the repository before relying on unattended releases:
+These settings live in GitHub, outside the checked-in workflows. Configure them in every
+repository created from this template before relying on enforcement or unattended releases:
 
 1. Under **Settings > Actions > General**, allow GitHub Actions to create pull requests.
-2. Protect `main`, require pull requests, and require the CI jobs appropriate to the repository,
-   including **Conventional PR title**. When adopting the separate title workflow, verify that the
-   existing required-check rule still binds to this check; update workflow-specific rules to
-   reference `pr-title.yml` after its first run.
-3. Prefer squash merging so the validated pull request title becomes the commit Release Please
-   evaluates.
-4. Restrict direct pushes and tag creation to maintainers and the release workflow.
+2. Protect `main`, require pull requests and passing CI checks, and apply the rules to
+   administrators. Require **Python quality** (which validates commit subjects) and
+   **Conventional PR title**, along with the Python test matrix, coverage, documentation, native
+   build matrix, static analysis, and sanitizer checks. Select GitHub Actions as their expected
+   source. Keep branches up to date before merging and disallow force pushes and branch deletion.
+   Zero required approvals supports a solo maintainer while still requiring a PR and its checks;
+   teams can add review requirements. Do not require the owner to approve their own PR.
+3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, disable merge
+   commits and rebase merging, and select a squash commit default that uses the **pull request
+   title** even for single-commit PRs (`squash_merge_commit_title: PR_TITLE`). Require linear
+   history on `main`. Keep the validated subject when confirming a squash merge; the UI still
+   permits editing that default, and the push check detects invalid subjects after merging.
+4. Restrict release tag creation to maintainers and the release workflow. Run both workflows on
+   a PR before selecting their required check names. The title check belongs to `pr-title.yml`;
+   renaming jobs later requires updating the protection settings.
 
 The workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions. GitHub suppresses
 ordinary workflow events caused by that token, so the release workflow deliberately invokes

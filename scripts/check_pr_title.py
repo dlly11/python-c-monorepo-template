@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import re
 import sys
 
-TITLE_PATTERN = re.compile(
-    r"(?:build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)"
-    r"(?:\([a-z0-9][a-z0-9._/-]*\))?!?: .+"
-)
+from conventional_commits import valid_subject
 
 
 def main() -> int:
     """Validate the title passed on the command line."""
-    if len(sys.argv) != 2 or TITLE_PATTERN.fullmatch(sys.argv[1]) is None:
+    if len(sys.argv) != 2 or not valid_subject(sys.argv[1]):
         title = sys.argv[1] if len(sys.argv) == 2 else ""
         print(f"invalid Conventional Commit pull request title: {title!r}", file=sys.stderr)
         print("example: feat(package-a): add JSON output", file=sys.stderr)
