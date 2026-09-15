@@ -109,12 +109,17 @@ From the repository root, these commands work in Bash, Zsh, and PowerShell:
 ```text
 uv python install 3.12
 uv sync --locked --all-packages
-uv run python scripts/doctor.py --profile python
+uv run repo-tools doctor --profile python
 ```
+
+Sync installs the private `repo-tools` CLI as an editable development dependency. Run
+`uv run repo-tools --help` to discover its commands. The
+[package guide](../tools/repo_tools/README.md) explains checkout selection and the plain-Python
+launcher used before installation.
 
 For native work, set `CC` and `CXX` before the first CMake configure. Use a fresh build directory
 when changing compiler families: an existing cache retains its compiler selection. Check native
-prerequisites with `python scripts/doctor.py --profile native`, or use `--profile analysis` for
+prerequisites with `python tools/repo_tools/run.py doctor --profile native`, or use `--profile analysis` for
 the static analysis tools. See [native dependency setup](native-quality.md#cpputest-dependency-policy)
 for restricted/offline builds.
 
@@ -124,9 +129,9 @@ uv dependency groups, installed by those commands.
 
 ## Understanding doctor output
 
-Run `python scripts/doctor.py --profile all` with an existing Python 3.12+ interpreter for a read-only
-check of all system prerequisites. The script itself never installs packages or changes PATH.
-Using the `uv run` prefix above can synchronize the workspace before the script starts.
+Run `python tools/repo_tools/run.py doctor --profile all` with an existing Python 3.12+ interpreter for a read-only
+check of all system prerequisites. The command itself never installs packages or changes PATH.
+Using the `uv run` prefix above can synchronize the workspace before the command starts.
 
 | Profile | Tools checked in addition to the running Python interpreter |
 | --- | --- |

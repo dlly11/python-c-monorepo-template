@@ -26,11 +26,11 @@ PR-title validator. Bodies and footers remain free-form. File checks run at the 
 Manual checks:
 
 ```bash
-uv run python scripts/check_pr_title.py "feat(package-a): add JSON output"
+uv run repo-tools check-pr-title "feat(package-a): add JSON output"
 COMMIT_MESSAGE_FILE=$(git rev-parse --git-path COMMIT_EDITMSG)
-uv run python scripts/check_commits.py --message-file "${COMMIT_MESSAGE_FILE}"
+uv run repo-tools check-commits --message-file "${COMMIT_MESSAGE_FILE}"
 git fetch origin
-uv run python scripts/check_commits.py --base origin/main --head HEAD
+uv run repo-tools check-commits --base origin/main --head HEAD
 ```
 
 `pre-commit run --all-files` runs file checks; it does not check a commit message. To exercise the
@@ -81,13 +81,19 @@ The subject format is `type(scope)!: description`; scope and `!` are optional. A
 Types and scopes are lowercase. Scopes start with a letter or digit and can contain letters,
 digits, `.`, `_`, `/`, and `-`. Descriptions must be nonempty with no surrounding whitespace or
 control characters. This is the repository's subset of [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
-implemented in `scripts/conventional_commits.py`. See [CI event behavior](testing.md#pr-and-post-merge-responsibilities)
+implemented in `tools/repo_tools/src/repo_tools/conventional_commits.py`. See [CI event behavior](testing.md#pr-and-post-merge-responsibilities)
 for checked commit ranges, and [releases](releases.md#conventional-commits) for version effects.
 
 ## Existing clone migration
 
-After pulling hook changes, rerun `uv run pre-commit install` to install both hooks. Repositories
-using the former CI layout should remove the separate **Python 3.12** required check: **Coverage**
+After pulling the tooling migration, run `uv sync --locked --all-packages` and
+`uv run pre-commit install` to refresh the environment and both hooks. Replace direct invocations
+of the former `scripts` directory with `uv run repo-tools NAME`, using hyphens in command names.
+For environments without installed dependencies, use `python tools/repo_tools/run.py NAME`.
+The old script paths have been removed. See the [package guide](../tools/repo_tools/README.md)
+for checkout selection.
+
+Repositories using the former CI layout should remove the separate **Python 3.12** required check: **Coverage**
 now provides it. Keep the remaining protection settings aligned with the [repository policy](releases.md#github-repository-settings).
 
 ## Change requirements
@@ -96,8 +102,8 @@ Include tests for observable behaviour. Changes to public Python APIs, C headers
 interfaces, or persistent formats require an explicit compatibility note in the pull request and
 a breaking-change marker when compatibility cannot be preserved.
 
-The Python check runs ty separately for each workspace member and then for repository scripts and
-their tests. Run the workspace consistency check after changing package names, membership, source
+The Python check runs ty separately for each workspace member and then for the private tooling
+package and its tests. Run the workspace consistency check after changing package names, membership, source
 namespaces, or shared registrations; it reports missing, stale, and duplicate entries.
 
 Git checks out text files with LF line endings through `.gitattributes`; `.editorconfig` configures

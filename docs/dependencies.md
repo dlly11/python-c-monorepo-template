@@ -22,8 +22,8 @@ See [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/).
 
 The `lint`, `test`, `dev`, `docs`, and `coverage` groups organize installation choices. They do not
 isolate dependencies. uv resolves all groups for the shared lockfile, including groups that are not
-currently installed. The default `dev` group includes lint and test tools; documentation and
-coverage commands explicitly request their groups. A lockfile can contain alternative versions for
+currently installed. The default `dev` group includes lint and test tools plus the private `repo-tools`
+package; documentation and coverage commands explicitly request their groups. A lockfile can contain alternative versions for
 different Python versions or platforms, but one environment still needs a compatible selection.
 
 For example, if one selected tool requires `shared-lib<2` and another requires `shared-lib>=2`,
@@ -46,6 +46,11 @@ also outside this repository's lockfile. uv describes those boundaries in its
 This template does not declare mutually exclusive groups or workspace members. Avoid forcing an
 incompatible resolution with overrides or manually installing conflicting packages into `.venv`.
 
+The private maintenance package is an editable path dependency at `tools/repo_tools`, resolved
+through the same root lockfile. It has no runtime dependencies and is outside workspace membership,
+so `uv build --all-packages` builds only the product distributions. Its version does not follow
+`version.txt`; see the [package guide](../tools/repo_tools/README.md).
+
 ## Where to declare dependencies
 
 - Put runtime dependencies in the consuming component's `pyproject.toml`, even when another member
@@ -64,7 +69,8 @@ workspace source mappings. See [uv's distribution build guidance](https://docs.a
 
 The root `[tool.uv].build-constraint-dependencies` declares the setuptools pin. This separate
 constraint pins the backend for editable installations through `uv sync`/`uv run`, local wheel
-checks, and release builds. Each member retains `setuptools>=77` in its build requirements;
+checks, and release builds. Each member and the private tooling package retain `setuptools>=77`
+in their build requirements;
 consumers rebuilding an individual source distribution do not inherit the root constraint.
 
 The root also requires uv 0.10.9 or newer, the release that fixed workspace build-constraint handling.
@@ -75,11 +81,11 @@ To upgrade the backend, edit that one root constraint to the chosen tested versi
 
 ```text
 uv lock
-uv sync --locked --all-packages --reinstall-package example-core --reinstall-package example-package-a --reinstall-package example-package-b --reinstall-package example-package-a-cli
-uv run python scripts/check_workspace.py
-uv run python scripts/check_python.py
+uv sync --locked --all-packages --reinstall-package example-core --reinstall-package example-package-a --reinstall-package example-package-b --reinstall-package example-package-a-cli --reinstall-package monorepo-repo-tools
+uv run repo-tools check-workspace
+uv run repo-tools check-python
 uv run pytest
-uv run python scripts/check_python_install.py
+uv run repo-tools check-python-install
 ```
 
 Explicit reinstallation rebuilds existing editable packages with the new backend. Adapt the member
