@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from repo_tools import cli, github_checks
-from repo_tools.commands import check_commits, set_version
+from repo_tools.commands import check_commits, check_coverage, set_version
 from repo_tools.context import resolve_root
 from repo_tools.repository_metadata import python_projects, version_errors
 
@@ -37,6 +37,78 @@ def test_invalid_workspace_metadata(tmp_path: Path, metadata: str) -> None:
     (tmp_path / "pyproject.toml").write_text(metadata, encoding="utf-8")
     with pytest.raises(ValueError, match="no repository workspace"):
         resolve_root(tmp_path)
+
+
+@pytest.mark.parametrize("command", ["build-docs", "check-coverage", "check-workspace"])
+@pytest.mark.parametrize(
+    "configuration,field",
+    [
+        ({}, "members"),
+        ({"members": "python/*"}, "members"),
+        ({"members": [1]}, "members"),
+        ({"members": [""]}, "members"),
+        ({"members": [], "exclude": "python/*"}, "exclude"),
+        ({"members": [], "exclude": [1]}, "exclude"),
+        ({"members": [], "exclude": [""]}, "exclude"),
+    ],
+)
+def test_malformed_workspace_fields_fail_without_effects(
+    repository: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    configuration: dict,
+    field: str,
+) -> None:
+    path = repository / "pyproject.toml"
+    path.write_text(
+        "[tool.uv.workspace]\n"
+        + "".join(f"{key} = {json.dumps(value)}\n" for key, value in configuration.items()),
+        encoding="utf-8",
+    )
+    for group in ("docs", "coverage"):
+        output = repository / "build" / group
+        output.mkdir(parents=True)
+        (output / "previous.txt").write_bytes(b"Previous results\r\n")
+    before = {path: path.read_bytes() for path in repository.rglob("*") if path.is_file()}
+    monkeypatch.setattr(check_coverage.platform, "system", lambda: "Linux")
+    run = Mock(side_effect=AssertionError("must reject metadata before subprocesses"))
+    monkeypatch.setattr(subprocess, "run", run)
+    assert cli.main(["--project-root", str(repository), command]) == 1
+    run.assert_not_called()
+    assert before == {path: path.read_bytes() for path in repository.rglob("*") if path.is_file()}
+    error = capsys.readouterr().err
+    assert "pyproject.toml" in error
+    assert f"tool.uv.workspace.{field} must be a list of nonempty strings" in error
+    assert "Traceback" not in error
+
+
+@pytest.mark.parametrize("command", ["build-docs", "check-coverage", "check-workspace"])
+@pytest.mark.parametrize("field", ["members", "exclude"])
+def test_absolute_workspace_globs_have_configuration_diagnostics(
+    repository: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    field: str,
+) -> None:
+    configuration = {"members": []}
+    configuration[field] = [str(repository / "absolute")]
+    (repository / "pyproject.toml").write_text(
+        "[tool.uv.workspace]\n"
+        + "".join(f"{key} = {json.dumps(value)}\n" for key, value in configuration.items()),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_coverage.platform, "system", lambda: "Linux")
+    run = Mock(side_effect=AssertionError("must reject the glob before subprocesses"))
+    monkeypatch.setattr(subprocess, "run", run)
+    assert cli.main(["--project-root", str(repository), command]) == 1
+    run.assert_not_called()
+    assert not (repository / "build").exists()
+    error = capsys.readouterr().err
+    assert "pyproject.toml" in error
+    assert f"tool.uv.workspace.{field}: invalid glob" in error
+    assert "Traceback" not in error
 
 
 @pytest.mark.parametrize("command", [["set-version", "2.0.0"], ["check-coverage"], ["build-docs"]])

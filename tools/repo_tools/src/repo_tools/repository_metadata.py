@@ -38,13 +38,31 @@ def read_project(path: Path) -> dict[str, Any]:
 
 def discover_members(root: Path, config: dict[str, Any]) -> tuple[list[Member], list[str]]:
     """Expand member/exclude globs and discover the template's src-layout packages."""
-    workspace = config["tool"]["uv"]["workspace"]
-    excluded = {
-        path.resolve() for pattern in workspace.get("exclude", []) for path in root.glob(pattern)
-    }
-    paths = {
-        path.resolve() for pattern in workspace["members"] for path in root.glob(pattern)
-    } - excluded
+    workspace = config
+    field = ""
+    for key in ("tool", "uv", "workspace"):
+        field = f"{field}.{key}" if field else key
+        value = workspace.get(key)
+        if not isinstance(value, dict):
+            raise ValueError(f"{root / 'pyproject.toml'}: {field} must be a table")
+        workspace = value
+
+    def expand(key: str, default: Any = None) -> set[Path]:
+        patterns = workspace.get(key, default)
+        label = f"{root / 'pyproject.toml'}: tool.uv.workspace.{key}"
+        if not isinstance(patterns, list) or any(
+            not isinstance(pattern, str) or not pattern for pattern in patterns
+        ):
+            raise ValueError(f"{label} must be a list of nonempty strings")
+        paths = set()
+        for pattern in patterns:
+            try:
+                paths.update(path.resolve() for path in root.glob(pattern))
+            except (ValueError, NotImplementedError) as error:
+                raise ValueError(f"{label}: invalid glob {pattern!r}: {error}") from error
+        return paths
+
+    paths = expand("members") - expand("exclude", [])
     members: list[Member] = []
     errors: list[str] = []
     for path in sorted(paths):

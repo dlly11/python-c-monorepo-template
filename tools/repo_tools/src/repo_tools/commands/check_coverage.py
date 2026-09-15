@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -83,6 +84,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Run both coverage suites and retain every report that can be generated."""
+    if platform.system() != "Linux":
+        print("coverage checks failed: native coverage requires Linux and GCC", file=sys.stderr)
+        print(
+            "No fresh results generated; existing coverage reports are unchanged.", file=sys.stderr
+        )
+        return 1
     check_environment(root, group="coverage", command="check-coverage")
     build_root = root / "build/coverage"
     report_root = build_root / "reports"

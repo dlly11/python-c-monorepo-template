@@ -9,6 +9,32 @@ import pytest
 
 from repo_tools import cli
 from repo_tools.commands import check_workspace
+from repo_tools.repository_metadata import discover_members
+
+
+@pytest.mark.parametrize(
+    "config,field",
+    [
+        ({}, "tool"),
+        ({"tool": 1}, "tool"),
+        ({"tool": {}}, "tool.uv"),
+        ({"tool": {"uv": []}}, "tool.uv"),
+        ({"tool": {"uv": {}}}, "tool.uv.workspace"),
+        ({"tool": {"uv": {"workspace": "invalid"}}}, "tool.uv.workspace"),
+    ],
+)
+def test_workspace_tables_are_validated(tmp_path: Path, config: dict, field: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        discover_members(tmp_path, config)
+    assert str(failure.value) == f"{tmp_path / 'pyproject.toml'}: {field} must be a table"
+
+
+@pytest.mark.parametrize("exclude", [False, True])
+def test_empty_workspace_members_are_valid(tmp_path: Path, exclude: bool) -> None:
+    workspace = {"members": []}
+    if exclude:
+        workspace["exclude"] = []
+    assert discover_members(tmp_path, {"tool": {"uv": {"workspace": workspace}}}) == ([], [])
 
 
 def write_root(root: Path, *, exclude: tuple[str, ...] = (), overlap: bool = False) -> None:

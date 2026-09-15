@@ -1,15 +1,18 @@
 """Real isolated interpreters must resolve sources from the selected checkout."""
 
 import os
+import shutil
 import subprocess
 import sys
 import venv
 from pathlib import Path
 from typing import Literal
+from unittest.mock import Mock
 
 import pytest
 
 from repo_tools import cli, environment
+from repo_tools.commands import check_coverage
 from repo_tools.context import resolve_root
 
 
@@ -39,9 +42,14 @@ def python_environment(
     (site / "sources.pth").write_text(
         f"{repository / 'python/packages/core/src'}\n{tooling / 'src'}\n", encoding="utf-8"
     )
-    for name in ("sphinx", "pytest", "pytest_cov", "gcovr"):
+    for name in ("sphinx", "breathe", "myst_parser", "furo", "pytest", "pytest_cov", "gcovr"):
         (site / f"{name}.py").write_text('raise AssertionError("preflight imported a tool")\n')
+    (site / "sphinxcontrib").mkdir()
+    (site / "sphinxcontrib/mermaid.py").write_text(
+        'raise AssertionError("preflight imported an extension")\n'
+    )
     monkeypatch.setattr(environment.sys, "executable", str(python))
+    monkeypatch.setattr(check_coverage.platform, "system", lambda: "Linux")
     return repository, site
 
 
@@ -61,6 +69,61 @@ def test_symlinked_checkout(python_environment: tuple[Path, Path], tmp_path: Pat
     except OSError:
         pytest.skip("creating directory symlinks is unavailable")
     environment.check_environment(resolve_root(alias), group="docs", command="build-docs")
+
+
+def test_documentation_parent_initializer_is_not_executed(
+    python_environment: tuple[Path, Path],
+) -> None:
+    root, site = python_environment
+    (site / "sphinxcontrib/__init__.py").write_text(
+        'raise AssertionError("preflight imported the parent package")\n'
+    )
+    environment.check_environment(root, group="docs", command="build-docs")
+
+
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize(
+    "missing",
+    [
+        ("sphinx",),
+        ("breathe",),
+        ("myst_parser",),
+        ("sphinxcontrib.mermaid",),
+        ("sphinxcontrib",),
+        ("furo",),
+        ("breathe", "furo"),
+    ],
+)
+def test_missing_documentation_dependencies_preserve_outputs(
+    python_environment: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    existing: bool,
+    missing: tuple[str, ...],
+) -> None:
+    root, site = python_environment
+    output = root / "build/docs"
+    if existing:
+        output.mkdir(parents=True)
+        (output / "previous.html").write_bytes(b"Previous documentation\r\n")
+    before = {path: path.read_bytes() for path in output.rglob("*") if path.is_file()}
+    for name in missing:
+        if name == "sphinxcontrib":
+            shutil.rmtree(site / name)
+        else:
+            (site / (name.replace(".", "/") + ".py")).unlink()
+    native_tools = Mock(side_effect=AssertionError("must fail before native tool checks"))
+    monkeypatch.setattr(shutil, "which", native_tools)
+    assert cli.main(["--project-root", str(root), "build-docs"]) == 1
+    native_tools.assert_not_called()
+    assert output.exists() == existing
+    assert before == {path: path.read_bytes() for path in output.rglob("*") if path.is_file()}
+    error = capsys.readouterr().err
+    for name in missing:
+        expected = "sphinxcontrib.mermaid" if name == "sphinxcontrib" else name
+        assert f"missing Python module: {expected}" in error
+    assert "uv sync --locked --all-packages --group docs" in error
+    assert "uv run --no-sync repo-tools build-docs" in error
 
 
 @pytest.mark.parametrize("command,group", [("build-docs", "docs"), ("check-coverage", "coverage")])

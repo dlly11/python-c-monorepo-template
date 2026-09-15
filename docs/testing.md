@@ -41,9 +41,10 @@ documentation with `uv run --group docs repo-tools build-docs` and open
 | Ordinary main push | Merged PR verification and version check | New squash/merge subjects and preserved or rebased PR commits | Latest successful verified push on current main |
 | Initial branch creation (zero previous SHA) | Full suite; no validation record | Inherited history is the baseline and is skipped | Never |
 
-Python 3.12 runs in **Coverage**; compatibility jobs cover 3.13 and 3.14. Required check names live
-in `tools/github/repository-policy.json`. Pages builds/deploys independently on main. Release builds
-and smoke-tests tagged artifacts without repeating the PR test and analysis suite.
+Python 3.12 runs in **Coverage** on Linux/GCC; compatibility jobs cover 3.13 and 3.14 with
+`--no-cov` to avoid collecting the same coverage on every interpreter. Required check names live
+in `tools/github/repository-policy.json`. Pages builds/deploys independently on main. Release
+builds and smoke-tests tagged artifacts without repeating the PR test and analysis suite.
 
 Push CI on `main` runs only `Merged PR verification`. It walks the new first-parent history backward
 from the push head, accepting squash commits, two-parent merge commits, and rebased PR sequences.
@@ -75,11 +76,7 @@ and never executes downloaded content. GitHub's repository artifact retention ap
 [CI evidence recovery](releases.md#recovering-expired-ci-evidence) for retry limits, rerunning
 original validation, and authorizing recovery from fresh CI on current main.
 
-CI regressions cover all three merge methods with matching trees, rewritten SHAs, incomplete rebase
-ranges, content mismatches, wrong parents or subjects, mixed merge methods in one push, wrong runs,
-missing/skipped jobs, release-bot manual dispatches, fork PRs, and unavailable artifacts. These tests
-run in the existing pytest suite. The post-merge job needs contents, actions, and pull-request
-read permissions. Documentation deployment continues to build and deploy independently.
+The post-merge job needs contents, actions, and pull-request read permissions.
 
 ## Python distribution checks
 
@@ -145,27 +142,20 @@ and reports the executable and limit. These limits apply to local builds and CI.
 
 ## Private tooling tests
 
-Workflow regression tests mock GitHub API reads to verify release eligibility, stale/pending/failed
-CI handling, manual and fork PR-title context, and GitHub policy drift. They run in the existing
-pytest suite without network access or additional CI jobs. Live settings audits are manual and
-read-only; see [the release guide](releases.md).
+The normal `uv run pytest` command discovers `tools/repo_tools/tests`, covering:
 
-The normal `uv run pytest` command also discovers `tools/repo_tools/tests`. These tests cover version
-validation, version-update rollback, native install validation, commit/PR-title syntax, wheel isolation,
-workspace registration consistency, and workstation diagnostics. Temporary-workspace tests cover
-added/removed/renamed members, exclusions, duplicate names, namespace drift, and incorrect release
-entries. Commit validation tests use real temporary Git repositories to cover introduced ranges,
-legacy history, synthetic PR merges, initial pushes, and unresolved refs. They also cover message
-files, multiline bodies, Windows line endings, and invalid subjects. Other tests use temporary
-files and mocked subprocesses where appropriate. The
-wheel-isolation regression installs tiny fixture wheels with uv in offline mode; it checks that an
-undeclared dependency fails even when its source is available on `PYTHONPATH`. That regression skips
-when uv is unavailable; normal development and CI runs provide uv.
-Tooling tests do not access the network or change committed metadata. They also exercise checkout
-discovery, explicit target roots, the source launcher without site-packages, and the private
-package’s exclusion from product version updates.
-Coverage thresholds continue to measure the four product packages; the private tooling is
-linted, type-checked, and tested in the existing jobs.
+- GitHub policy, commit/title validation, all three merge methods, CI evidence, and release recovery.
+- Workspace registrations, product version consistency, and version-update rollback.
+- Installed artifacts, checkout selection, isolated Python environments, and prerequisite failures.
+
+Tests use temporary files, real local Git repositories and virtual environments, and mocked GitHub
+API reads. They do not access the network or change committed metadata. The wheel-isolation
+regression uses uv offline to verify that undeclared imports fail even with source on `PYTHONPATH`;
+it skips when uv is unavailable. Normal development and CI provide uv.
+
+Private tooling is linted, type-checked, and tested in the existing jobs; coverage thresholds
+measure product code. Live GitHub settings audits are manual and read-only; see the
+[release guide](releases.md).
 
 ## Coverage policy
 
@@ -192,14 +182,15 @@ uv sync --locked --all-packages --group coverage
 uv run --group coverage repo-tools check-coverage
 ```
 
-Before changing outputs, documentation and coverage check that the selected checkout's first-party
-packages and required Python tools are available through the running interpreter. They run Python
-tools as isolated modules, so another `pytest`, `gcovr`, or `sphinx` executable on PATH cannot select
-a different environment. Coverage also checks its native executables.
+Coverage rejects platforms other than Linux before probing dependencies or changing outputs.
+Documentation and coverage check that the selected checkout's first-party packages and required
+Python tools are available through the running interpreter, including documentation extensions
+and the theme. They run Python tools as isolated modules, so another `pytest`, `gcovr`, or `sphinx`
+executable on PATH cannot select a different environment. Coverage also checks its native executables.
 
-Missing dependencies or mismatched sources fail before replacing reports or creating output
-directories. Follow the reported sync and rerun commands; previous reports still describe their
-original run. `--project-root` selects checkout files, not a Python environment; see the
+These prerequisite failures leave existing reports unchanged. Follow the reported sync and rerun
+commands; previous reports still describe their original run. A later build or test failure can
+leave partial output. `--project-root` selects checkout files, not a Python environment; see the
 [package guide](../tools/repo_tools/README.md#checkout-and-python-environment).
 
 After preflight succeeds, the command removes the previous `build/coverage` directory, runs both
@@ -221,12 +212,10 @@ uv run --group coverage gcovr --config tools/coverage/gcovr.cfg \
 
 ## Continuous integration reports
 
-The `Coverage` job runs once on Linux with Python 3.12 and GCC and provides the Python 3.12 test
-result. Python 3.13 and 3.14 compatibility jobs use
-`--no-cov` because collecting identical data on every supported interpreter would not improve the
-gate. The coverage job writes its table to the GitHub Actions job summary and retains the complete
+The `Coverage` job writes its table to the GitHub Actions job summary and retains the complete
 report directory as the `coverage-reports` artifact for 14 days. Reports are uploaded even when a
-test or threshold fails, when enough data was generated to create them.
+test or threshold fails, when enough data was generated to create them. See
+[CI responsibilities](#pr-and-post-merge-responsibilities) for interpreter assignments.
 
 ## Native release smoke checks
 

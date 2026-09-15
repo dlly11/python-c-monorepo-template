@@ -14,7 +14,36 @@ from repo_tools.commands import check_coverage
 def coverage(repository: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, Path]:
     module = check_coverage
     monkeypatch.setattr(module, "check_environment", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module.platform, "system", lambda: "Linux")
     return module, repository / "build/coverage"
+
+
+@pytest.mark.parametrize("system", ["Darwin", "Windows"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_unsupported_platform_fails_before_probes_or_output_changes(
+    coverage: tuple[ModuleType, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    system: str,
+    existing: bool,
+) -> None:
+    module, build = coverage
+    if existing:
+        build.mkdir(parents=True)
+        (build / "previous.html").write_bytes(b"Previous results\r\n")
+    before = {path: path.read_bytes() for path in build.rglob("*") if path.is_file()}
+    monkeypatch.setattr(module.platform, "system", lambda: system)
+    probe = Mock(side_effect=AssertionError("must reject the platform before probing"))
+    monkeypatch.setattr(module, "check_environment", probe)
+    monkeypatch.setattr(module.shutil, "which", probe)
+    monkeypatch.setattr(module.subprocess, "run", probe)
+    assert cli.main(["check-coverage"], default_root=build.parents[1]) == 1
+    probe.assert_not_called()
+    assert build.exists() == existing
+    assert before == {path: path.read_bytes() for path in build.rglob("*") if path.is_file()}
+    error = capsys.readouterr().err
+    assert "native coverage requires Linux and GCC" in error
+    assert "existing coverage reports are unchanged" in error
 
 
 @pytest.mark.parametrize("existing", [False, True])
