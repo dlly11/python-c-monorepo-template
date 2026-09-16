@@ -252,6 +252,8 @@ build and smoke-test executables with only uv on PATH. The Linux x64 job additio
 a generated project, including Python quality/tests/wheels, native tests/install/consumer, and docs.
 All six jobs are required upstream; generated repositories omit those jobs and policy entries.
 The existing `check-python` command also type-checks the build helpers in `tools/creator`.
+The default lint dependencies include setuptools so the creator's custom build backend can
+be type-checked without installing the optional executable-build dependencies.
 
 Build and check a local executable with:
 
