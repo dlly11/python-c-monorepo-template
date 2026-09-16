@@ -9,7 +9,7 @@ from pathlib import Path
 from zipfile import BadZipFile
 
 from template_creator import config, snapshot
-from template_creator.generate import generate
+from template_creator.generate import check_destination, generate
 from template_creator.render import render
 from template_creator.wizard import edit, summary, wizard
 
@@ -35,7 +35,9 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--config", type=Path, required=True)
     create.add_argument("--output", type=Path, required=True)
     create.add_argument(
-        "--dry-run", action="store_true", help="preview without writing or invoking uv"
+        "--dry-run",
+        action="store_true",
+        help="preview files and check the destination without writing or invoking uv",
     )
     return parser
 
@@ -61,8 +63,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "validate":
                 print("Configuration is valid.\n" + summary(recipe))
             elif args.dry_run:
+                destination = check_destination(args.output)
                 print(summary(recipe))
-                print(f"\nDestination: {args.output.absolute()}\nFiles:")
+                print(f"\nDestination: {destination}\nFiles:")
                 print("\n".join(sorted(render(template, recipe))))
             else:
                 generate(template, recipe, args.output)

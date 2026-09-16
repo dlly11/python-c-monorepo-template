@@ -88,13 +88,19 @@ def require_uv() -> str:
     return uv
 
 
-def generate(snapshot: Snapshot, config: Config, output: Path) -> None:
-    """Leave existing destinations untouched and clean up owned staging files on error."""
+def check_destination(output: Path) -> Path:
+    """Check destination constraints without writing files or probing external tools."""
     output = output.absolute()
     if os.path.lexists(output):
         raise ValueError(f"destination already exists: {output}")
     if not output.parent.is_dir():
         raise ValueError(f"destination parent does not exist: {output.parent}")
+    return output
+
+
+def generate(snapshot: Snapshot, config: Config, output: Path) -> None:
+    """Leave existing destinations untouched and clean up owned staging files on error."""
+    output = check_destination(output)
     uv = require_uv()
     files = render(snapshot, config)
     with tempfile.TemporaryDirectory(prefix=".template-create-", dir=output.parent) as temporary:
@@ -110,8 +116,11 @@ def generate(snapshot: Snapshot, config: Config, output: Path) -> None:
         ruff_version = next(package["version"] for package in packages if package["name"] == "ruff")
         ruff = [uv, "tool", "run", "--python", python, "--from", f"ruff=={ruff_version}", "ruff"]
         print("Formatting renamed Python and native sources...", flush=True)
+        # Renaming can create long lines which only the formatter can repair.
+        # Defer lint diagnostics until after formatting; tool errors still fail.
+        run([*ruff, "check", "--fix", "--exit-zero", "."], root)
         run([*ruff, "format", "."], root)
-        run([*ruff, "check", "--fix", "."], root)
+        run([*ruff, "check", "."], root)
         native = [
             str(path.relative_to(root))
             for path in sorted((root / "native").rglob("*"))

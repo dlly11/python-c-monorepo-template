@@ -70,7 +70,8 @@ when dependencies must come from an approved local source.
 - [Testing](docs/testing.md): local checks, coverage, and CI responsibilities.
 - [Architecture](docs/architecture.md): component boundaries, new packages, and native consumption.
 - [Dependencies](docs/dependencies.md): shared environments, conflicts, and tool upgrades.
-- [Releases](docs/releases.md): version metadata, GitHub settings, and recovery.
+- [GitHub setup](docs/github-setup.md): hosting, repository settings, and release credentials.
+- [Releases](docs/releases.md): version metadata, automation, and recovery.
 - [Adopting the template](docs/adopting.md): naming, registration, and initialization.
 - [Security](docs/SECURITY.md): private vulnerability reporting.
 

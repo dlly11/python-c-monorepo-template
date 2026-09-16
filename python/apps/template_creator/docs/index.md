@@ -118,7 +118,11 @@ typographical errors cannot silently change the output.
 
 Slugs use lowercase hyphen-separated words, starting with a letter. Prefixes use lowercase
 letters/digits with optional underscores, starting with a letter; Python keywords, Windows
-reserved names, and template/tooling names are rejected. Human-readable names may contain
+reserved names, and template/tooling names are rejected. The shared prefix is limited to
+32 characters, including underscores. This is a creator naming policy, not a guarantee against
+platform path-length limits. Earlier creators accepted longer prefixes; shorten those names
+when creating a recipe for this release. Names are never truncated automatically.
+Human-readable names may contain
 Unicode and punctuation. GitHub identities and CODEOWNERS are syntax-checked locally; users
 must still configure their actual repositories and grant owners access.
 
@@ -138,6 +142,9 @@ remain `core`, `package_a`, `package_b`, and `package_a_cli`.
 
 Changing the slug or owner in the guide updates a documentation URL that still matches the
 previous GitHub Pages default. A custom URL remains unchanged.
+The documentation URL updates links and Sphinx metadata; it does not configure hosting.
+See [GitHub setup](../../../../docs/github-setup.md#documentation-hosting) for default Pages,
+custom Pages domains, and external hosts. HTTPS URLs may use an explicit port from 1 to 65535.
 
 The initial version defaults to `0.1.0`. For this new project, dependency lower bounds between
 workspace members start at that baseline. Private `repo-tools` keeps its independent version.
@@ -161,7 +168,9 @@ template-create generate --config template-config.toml --output ./acme
 
 Validation and previews do not invoke uv, access the network, or write files. Actual generation
 requires a nonexistent destination with an existing parent directory. Paths are relative to
-the command's working directory. Template identity mismatches require the original release
+the command's working directory. A preview checks the same destination constraints, including
+rejecting dangling symlinks, but does not resolve dependencies or guarantee write access.
+Template identity mismatches require the original release
 executable/wheel, or a newly created config; editing identity fields is not an upgrade procedure.
 Source-checkout configs also change identity when canonical template inputs change.
 

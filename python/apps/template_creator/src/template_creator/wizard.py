@@ -8,9 +8,27 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from template_creator.config import LICENSES, Config, load_editable, owners, save, validate
+from template_creator.config import (
+    LICENSES,
+    MAX_PREFIX_LENGTH,
+    Config,
+    load_editable,
+    owners,
+    save,
+    validate,
+    validate_prefix,
+)
 from template_creator.generate import generate
 from template_creator.snapshot import SOURCE_URL, Snapshot
+
+SECTIONS = (
+    "Project and naming",
+    "GitHub and documentation",
+    "Author",
+    "Security contact",
+    "Ownership",
+    "License",
+)
 
 
 def ask(label: str, default: str = "") -> str:
@@ -76,13 +94,23 @@ def section(number: int, data: dict[str, Any]) -> None:
         slug = ask(
             "Repository slug", old.get("slug", re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-"))
         )
+        description = ask("One-line description", old.get("description", ""))
+        while True:
+            prefix = ask(
+                f"Shared Python/C namespace prefix (maximum {MAX_PREFIX_LENGTH} characters)",
+                old.get("prefix", slug.replace("-", "_")),
+            )
+            try:
+                validate_prefix(prefix)
+            except ValueError as error:
+                print(error)
+            else:
+                break
         data["project"] = {
             "name": name,
             "slug": slug,
-            "description": ask("One-line description", old.get("description", "")),
-            "prefix": ask(
-                "Shared Python/C namespace prefix", old.get("prefix", slug.replace("-", "_"))
-            ),
+            "description": description,
+            "prefix": prefix,
             "version": ask("Initial version", old.get("version", "0.1.0")),
         }
         if "github" in data:
@@ -157,7 +185,7 @@ def section(number: int, data: dict[str, Any]) -> None:
         while (choice := ask("License", old.get("choice", ""))) not in LICENSES:
             print("Choose one of the listed names exactly.")
         year = ask("Copyright year", str(old.get("year", date.today().year)))
-        while not year.isdigit() or not 1000 <= int(year) <= 9999:
+        while not re.fullmatch(r"[0-9]{4}", year) or not 1000 <= int(year) <= 9999:
             year = ask("Enter a four-digit copyright year")
         content = ""
         if choice == "Custom":
@@ -184,9 +212,9 @@ def section(number: int, data: dict[str, Any]) -> None:
         }
 
 
-def require_new_config(path: Path) -> None:
+def require_new_config(path: Path, option: str = "--config") -> None:
     if os.path.lexists(path):
-        raise ValueError(f"config already exists: {path}; choose another --config path")
+        raise ValueError(f"config already exists: {path}; choose another {option} path")
     if not path.parent.is_dir():
         raise ValueError(f"config parent does not exist: {path.parent}")
 
@@ -194,6 +222,7 @@ def require_new_config(path: Path) -> None:
 def review(snapshot: Snapshot, data: dict[str, Any], path: Path) -> None:
     """Share section editing and full validation between new and existing recipes."""
     while True:
+        print("\n".join(f"{number}. {label}" for number, label in enumerate(SECTIONS, start=1)))
         try:
             config = validate(data, snapshot)
         except ValueError as error:
@@ -214,7 +243,7 @@ def review(snapshot: Snapshot, data: dict[str, Any], path: Path) -> None:
 
 def edit(snapshot: Snapshot, source: Path, output: Path) -> None:
     """Edit a compatible saved recipe into a new file without generating a project."""
-    require_new_config(output)
+    require_new_config(output, "--output")
     data = load_editable(source, snapshot)
     review(snapshot, data, output)
 
@@ -234,8 +263,8 @@ def wizard(snapshot: Snapshot, path: Path) -> None:
         "schema_version": 1,
         "template": {"version": snapshot.version, "digest": snapshot.digest, "source": SOURCE_URL},
     }
-    for number in range(1, 7):
-        print(f"\nStep {number}/6")
+    for number, label in enumerate(SECTIONS, start=1):
+        print(f"\nStep {number}/{len(SECTIONS)}: {label}")
         section(number, data)
     review(snapshot, data, path)
     if ask_yes_no("Create repository now?", default=True):

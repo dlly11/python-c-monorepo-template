@@ -34,7 +34,7 @@ def main() -> None:
                 "name": 'Acme "Research"',
                 "slug": "acme-research",
                 "description": "Research tools.",
-                "prefix": "acme_lab",
+                "prefix": "acme_research_infrastructure_lab",
                 "version": "0.2.0",
             },
             "github": {

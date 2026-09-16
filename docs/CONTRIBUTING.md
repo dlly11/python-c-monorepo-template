@@ -84,6 +84,7 @@ control characters. This is the repository's subset of [Conventional Commits](ht
 implemented in `tools/repo_tools/src/repo_tools/conventional_commits.py`. See [CI event behavior](testing.md#pr-and-post-merge-responsibilities)
 for checked commit ranges, and [releases](releases.md#conventional-commits) for version effects.
 
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
 ## Existing clone migration
 
 After pulling the tooling migration, run `uv sync --locked --all-packages` and
@@ -94,7 +95,9 @@ The old script paths have been removed. See the [package guide](../tools/repo_to
 for checkout selection.
 
 Repositories using the former CI layout should remove the separate **Python 3.12** required check: **Coverage**
-now provides it. Keep the remaining protection settings aligned with the [repository policy](releases.md#github-repository-settings).
+now provides it. Keep the remaining protection settings aligned with the [repository policy](github-setup.md#repository-settings).
+
+<!-- END TEMPLATE CREATOR ONLY -->
 
 ## Change requirements
 

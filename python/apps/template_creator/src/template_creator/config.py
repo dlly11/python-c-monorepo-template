@@ -26,6 +26,7 @@ FIELDS = {
 VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 SLUG = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 PREFIX = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+MAX_PREFIX_LENGTH = 32
 EMAIL = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
 OWNER = re.compile(
     r"@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
@@ -72,13 +73,32 @@ def text(value: Any, field: str) -> str:
 
 
 def https_url(value: str) -> bool:
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return False
     return (
         parsed.scheme == "https"
         and bool(parsed.hostname)
+        and not parsed.netloc.endswith(":")
+        and (port is None or 1 <= port <= 65535)
         and not (parsed.username or parsed.password or parsed.query or parsed.fragment)
         and not any(c.isspace() or c in '<>"\\' for c in value)
     )
+
+
+def validate_prefix(prefix: str) -> None:
+    if (
+        len(prefix) > MAX_PREFIX_LENGTH
+        or not PREFIX.fullmatch(prefix)
+        or keyword.iskeyword(prefix)
+        or prefix in RESERVED | {"example", "repo_tools", "template_creator"}
+    ):
+        raise ValueError(
+            f"project.prefix: use a new lowercase identifier of at most {MAX_PREFIX_LENGTH} "
+            "characters, optionally separated by underscores"
+        )
 
 
 def owners(value: Any, field: str) -> None:
@@ -161,14 +181,7 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
             "project.slug: use lowercase hyphen-separated words, starting with a letter"
         )
     prefix = project["prefix"]
-    if (
-        not PREFIX.fullmatch(prefix)
-        or keyword.iskeyword(prefix)
-        or prefix in RESERVED | {"example", "repo_tools", "template_creator"}
-    ):
-        raise ValueError(
-            "project.prefix: use a new lowercase identifier, optionally separated by underscores"
-        )
+    validate_prefix(prefix)
     if project["slug"] in {
         f"{prefix.replace('_', '-')}-{suffix}"
         for suffix in ("core", "package-a", "package-b", "package-a-cli")
