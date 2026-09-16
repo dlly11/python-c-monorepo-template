@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.1.0...v1.2.0) (2026-09-16)
+
+
+### Features
+
+* improve repository creation and add optional release auto-merge ([cf12cb9](https://github.com/dlly11/python-c-monorepo-template/commit/cf12cb92c7b17877746e9be482903136d6f0d394))
+
 ## [1.1.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.3...v1.1.0) (2026-09-16)
 
 
