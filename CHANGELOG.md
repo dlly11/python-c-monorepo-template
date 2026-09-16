@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.3...v1.1.0) (2026-09-16)
+
+
+### Features
+
+* add guided repository creator ([cb7e01c](https://github.com/dlly11/python-c-monorepo-template/commit/cb7e01c7b277a90cf52afd32fa196f89ba7a62cb))
+
+
+### Bug Fixes
+
+* **ci:** install backend dependency for type checks ([dd862c0](https://github.com/dlly11/python-c-monorepo-template/commit/dd862c0bdbb1088aa1df669eb50ff87f2f72115c))
+
 ## [1.0.3](https://github.com/dlly11/python-c-monorepo-template/compare/v1.0.2...v1.0.3) (2026-09-15)
 
 
