@@ -316,3 +316,24 @@ gh release upload "${RELEASE_TAG}" "dist/${ARCHIVE}" --clobber
 
 Recovery attaches assets to the existing release; it does not require a new version, tag, or
 release-creation run. Inspect the release's assets after the upload completes.
+
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
+## Repository creator assets
+
+The creator wheel/source distribution follows the repository's lockstep release version and is
+included in Python assets. Six platform-specific executable archives and their `.sha256` files
+are built from the release tag. Each executable is smoke-tested before upload. Release jobs reuse
+the same build command as PR CI without repeating the full quality or generated-project suite.
+All Actions remain pinned by SHA. The downloads are unsigned (macOS uses ad-hoc signing only).
+No signing account, certificate, or notarization secret is required.
+
+When adopting this feature upstream, add all six **Repository creator (PLATFORM-ARCH)** checks
+from the repository policy to GitHub branch protection. The generated template excludes them.
+
+For a failed creator upload, rerun the failed asset job in the original release run. If that run
+is no longer available, check out the exact release tag on the matching platform, install the
+`creator-build` group, and run `python tools/creator/build.py --target PLATFORM-ARCH` through uv.
+It rebuilds and smoke-tests the archive and checksum under `dist/creator`. Upload that matching
+pair to the existing release with `gh release upload TAG ARCHIVE CHECKSUM --clobber` after both
+pass. Do not rebuild an old release's creator using a newer template snapshot.
+<!-- END TEMPLATE CREATOR ONLY -->

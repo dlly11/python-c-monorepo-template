@@ -33,6 +33,11 @@
           "jsonpath": "$.project.version"
         },
         {
+          "type": "toml",
+          "path": "python/apps/template_creator/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
           "type": "generic",
           "path": "CMakeLists.txt"
         }

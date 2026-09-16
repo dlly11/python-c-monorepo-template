@@ -9,6 +9,15 @@ core ──> package_a ──> package_a_cli
   └────> package_b
 ```
 
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
+## Create your own repository
+
+Download the repository creator from [Releases](https://github.com/dlly11/python-c-monorepo-template/releases),
+or run `uv run template-create wizard` from this checkout. The guide saves a reusable TOML
+configuration and creates a project with your names, license, contacts, and ownership.
+See the [creation guide](python/apps/template_creator/docs/index.md) for prerequisites and downloads.
+<!-- END TEMPLATE CREATOR ONLY -->
+
 ## Quick start
 
 Install the prerequisites for your platform using the [workstation guide](docs/workstation.md).

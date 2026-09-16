@@ -21,3 +21,8 @@ compile_commands.json
 .vscode/
 .DS_Store
 Thumbs.db
+
+# BEGIN TEMPLATE CREATOR ONLY
+python/apps/template_creator/src/template_creator/_template.zip
+template-config.toml
+# END TEMPLATE CREATOR ONLY

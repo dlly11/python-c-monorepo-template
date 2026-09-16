@@ -30,6 +30,7 @@ SECURITY
 ../python/packages/package_a/docs/index
 ../python/packages/package_b/docs/index
 ../python/apps/package_a_cli/docs/index
+../python/apps/template_creator/docs/index
 ```
 
 ```{toctree}

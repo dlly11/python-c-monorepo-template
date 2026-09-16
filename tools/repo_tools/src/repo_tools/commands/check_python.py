@@ -19,8 +19,12 @@ def check_projects(root: Path) -> None:
         print(f"==> ty check {path.parent}", flush=True)
         subprocess.run(["ty", "check", "--project", str(project)], cwd=root, check=True)
     print("==> ty check private tooling (including tests)", flush=True)
+    tooling = [root / "tools/repo_tools"]
+    # BEGIN TEMPLATE CREATOR ONLY
+    tooling.append(root / "tools/creator")
+    # END TEMPLATE CREATOR ONLY
     subprocess.run(
-        ["ty", "check", "--project", str(root), str(root / "tools/repo_tools")],
+        ["ty", "check", "--project", str(root), *(str(path) for path in tooling)],
         cwd=root,
         check=True,
     )

@@ -243,3 +243,27 @@ The Python quality job runs `uv run pre-commit run actionlint --all-files`. Loca
 same actionlint hook for changed workflow files. Its version is pinned in the pre-commit config;
 optional ShellCheck and Pyflakes integrations are disabled so installed optional tools do not
 change the result. No separate workflow-lint job is required.
+
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
+## Repository creator validation
+
+Creator tests run in the existing Python suite. Six **Repository creator (PLATFORM-ARCH)** jobs
+build and smoke-test executables with only uv on PATH. The Linux x64 job additionally validates
+a generated project, including Python quality/tests/wheels, native tests/install/consumer, and docs.
+All six jobs are required upstream; generated repositories omit those jobs and policy entries.
+The existing `check-python` command also type-checks the build helpers in `tools/creator`.
+
+Build and check a local executable with:
+
+```bash
+uv sync --locked --all-packages --group creator-build
+uv run --no-sync python tools/creator/check_inventory.py
+uv run --no-sync python tools/creator/build.py --target linux-x64
+uv run --no-sync python tools/creator/smoke.py --work-dir build/creator/full --full
+```
+
+Use the matching `linux`, `windows`, or `macos` and `x64` or `arm64` target for your host.
+The full smoke check requires Linux and the normal native/documentation prerequisites. Choose
+an unused work directory for each run. Builds include the tracked-file inventory, source-distribution
+round-trip tests, wheel smoke checks, and existing version/registration checks.
+<!-- END TEMPLATE CREATOR ONLY -->

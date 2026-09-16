@@ -39,4 +39,5 @@ def test_hanging_command_is_terminated(tmp_path: Path, with_argument: bool) -> N
     )
     assert result.returncode != 0
     assert "10-second timeout" in result.stderr
-    assert sys.executable in result.stderr
+    # CMake wraps diagnostic lines at spaces in long checkout paths.
+    assert " ".join(sys.executable.split()) in " ".join(result.stderr.split())

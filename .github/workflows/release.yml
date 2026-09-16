@@ -196,3 +196,40 @@ jobs:
           ARCHIVE: ${{ github.event.repository.name }}-${{ needs.release-please.outputs.tag-name }}-${{ runner.os }}-${{ runner.arch }}.zip
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${RELEASE_TAG}" "dist/${ARCHIVE}" --clobber
+
+  # BEGIN TEMPLATE CREATOR ONLY
+  creator-assets:
+    name: Publish repository creator (${{ matrix.target }})
+    if: needs.release-please.outputs.release-created == 'true'
+    needs: release-please
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, target: linux-x64}
+          - {os: ubuntu-22.04-arm, target: linux-arm64}
+          - {os: windows-2022, target: windows-x64}
+          - {os: windows-11-arm, target: windows-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+          - {os: macos-14, target: macos-arm64}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.tag-name }}
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --all-packages --group creator-build
+      - run: uv run --no-sync python tools/creator/build.py --target ${{ matrix.target }}
+      - name: Upload tested creator archive and checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
+        run: gh release upload "${RELEASE_TAG}" dist/creator/* --clobber
+  # END TEMPLATE CREATOR ONLY

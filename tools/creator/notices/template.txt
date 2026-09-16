@@ -1,0 +1,7 @@
+Template source: https://github.com/dlly11/python-c-monorepo-template
+
+You may use, copy, modify, distribute, and relicense the template's files, including
+for commercial or proprietary projects. This permission does not transfer ownership
+of the original template repository. Third-party dependencies retain their own terms.
+
+Standard license choices are sourced from https://github.com/github/choosealicense.com.
