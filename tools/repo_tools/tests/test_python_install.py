@@ -84,7 +84,11 @@ def test_install_uses_only_declared_dependencies(
         module.SMOKE_CHECKS,
         "example-package-a",
         SmokeCheck(
-            "example_package_a", 'from example_package_a import message\nassert message == "Hello"'
+            "example_package_a",
+            """
+from example_package_a import message
+assert message == "Hello"
+""",
         ),
     )
     monkeypatch.setenv("UV_OFFLINE", "1")
@@ -201,7 +205,13 @@ def test_install_discovers_selected_project_configuration(
     monkeypatch.setitem(
         module.SMOKE_CHECKS,
         "example-core",
-        SmokeCheck("example_core", 'from example_core import message\nassert message == "Private"'),
+        SmokeCheck(
+            "example_core",
+            """
+from example_core import message
+assert message == "Private"
+""",
+        ),
     )
     for variable in ("UV_NO_CONFIG", "UV_FIND_LINKS", "UV_CONFIG_FILE"):
         monkeypatch.delenv(variable, raising=False)

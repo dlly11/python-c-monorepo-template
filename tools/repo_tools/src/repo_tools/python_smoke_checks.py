@@ -39,7 +39,12 @@ SMOKE_CHECKS = {
     "example-core": SmokeCheck(
         "example_core",
         """
-from example_core import Message, MessageKind, create_message, normalize_name
+from example_core import (
+    Message,
+    MessageKind,
+    create_message,
+    normalize_name,
+)
 assert normalize_name(" Ada  Lovelace ") == "Ada Lovelace"
 assert create_message(kind=MessageKind.GREETING, source="smoke", prefix="Hi", name="Ada") == (
     Message(kind=MessageKind.GREETING, source="smoke", text="Hi, Ada!")

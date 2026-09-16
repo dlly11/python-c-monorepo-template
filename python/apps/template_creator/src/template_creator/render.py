@@ -270,11 +270,12 @@ The generated configuration does not install compilers or development dependenci
 2. Review all files, then create a Conventional Commit such as `chore: initialize project`.
 3. Create an empty GitHub repository at `{github["owner"]}/{github["repository"]}` and push
    the initial `main` branch. Do not initialize the remote with a separate README or license.
-4. Enable Actions and GitHub Pages using the Actions deployment source. The intended
-   documentation address is <{github["docs_url"]}>.
+4. Enable Actions and configure documentation hosting for <{github["docs_url"]}>.
+   Follow the [hosting choices](github-setup.md#documentation-hosting) for default Pages,
+   a Pages custom domain, or an external host. Setting the URL does not configure hosting.
 5. Let initialization CI pass. If no run is created, dispatch `ci.yml` on `main`.
 6. Configure the merge methods, required checks, release permissions, and branch protection
-   in the [release guide](releases.md#github-repository-settings). Confirm CODEOWNERS entries
+   in the [GitHub setup guide](github-setup.md#repository-settings). Confirm CODEOWNERS entries
    have access to the repository; syntax validation cannot check GitHub permissions.
 7. Run `uv run repo-tools check-github-settings --repo {github["owner"]}/{github["repository"]}`.
 8. Make subsequent changes on a branch and open the first protected PR. Its verified merge

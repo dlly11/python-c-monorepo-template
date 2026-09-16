@@ -22,7 +22,7 @@ merged-PR verification. The release workflow skips preparation because there is 
 If no initialization run was created, manually dispatch `ci.yml` on main to validate the baseline;
 that run also does not authorize a release.
 
-Configure branch protection and merge methods using the [release guide](releases.md), then make
+Configure branch protection and merge methods using the [GitHub setup guide](github-setup.md), then make
 renaming, version, and setup changes on a feature branch. Open a PR and let its full CI and title
 checks pass before merging. This first protected PR integration establishes ordinary post-merge
 verification and release automation. Do not bypass the PR requirement to commit setup changes
@@ -106,11 +106,12 @@ Set the `"."` value in `tools/release-please/manifest.json` to that same baselin
 inherited changelog with your project's initial history. The setter deliberately does not change
 Release Please state, create tags, or publish a release. Subsequent releases use the normal
 [release workflow](releases.md); do not reset version history in an already released fork.
-Configure Pages and required checks using that guide before relying on automation.
+Configure hosting and required checks using [GitHub setup](github-setup.md) before relying on automation.
 Review `tools/github/repository-policy.json` and run
 `uv run repo-tools check-github-settings --repo OWNER/REPO` after configuring the new
-repository. The audit reports drift without applying settings; see the release guide for access
-requirements and exit codes. Keep policy and workflow branch/check names aligned when renaming.
+repository. The audit reports drift without applying settings; see the
+[settings audit](github-setup.md#audit-the-managed-github-settings) for access requirements and exit
+codes. Keep policy and workflow branch/check names aligned when renaming.
 
 ## 4. Find leftovers and validate
 

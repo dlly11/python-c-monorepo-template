@@ -17,6 +17,7 @@ adopting
 dependencies
 testing
 native-quality
+github-setup
 releases
 CONTRIBUTING
 SECURITY
