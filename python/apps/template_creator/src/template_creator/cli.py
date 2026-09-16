@@ -11,7 +11,7 @@ from zipfile import BadZipFile
 from template_creator import config, snapshot
 from template_creator.generate import generate
 from template_creator.render import render
-from template_creator.wizard import summary, wizard
+from template_creator.wizard import edit, summary, wizard
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,6 +22,9 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command")
     guide = commands.add_parser("wizard", help="create a configuration step by step")
     guide.add_argument("--config", type=Path, default=Path("template-config.toml"))
+    editor = commands.add_parser("edit", help="edit a saved recipe into a new configuration file")
+    editor.add_argument("--config", type=Path, required=True)
+    editor.add_argument("--output", type=Path, required=True)
     validate = commands.add_parser(
         "validate", help="validate a configuration without writing files"
     )
@@ -44,12 +47,15 @@ def main(argv: list[str] | None = None) -> int:
         template = snapshot.load()
         if args.version:
             print(f"template-create {template.version}\ntemplate SHA-256: {template.digest}")
-        elif args.command in {None, "wizard"}:
+        elif args.command in {None, "wizard", "edit"}:
             if not sys.stdin.isatty():
                 parser.error(
-                    "wizard requires a terminal; use generate --config FILE --output DIRECTORY"
+                    "wizard/edit requires a terminal; use generate --config FILE --output DIRECTORY"
                 )
-            wizard(template, getattr(args, "config", Path("template-config.toml")))
+            if args.command == "edit":
+                edit(template, args.config, args.output)
+            else:
+                wizard(template, getattr(args, "config", Path("template-config.toml")))
         else:
             recipe = config.load(args.config, template)
             if args.command == "validate":

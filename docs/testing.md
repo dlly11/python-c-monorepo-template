@@ -90,8 +90,12 @@ uv run repo-tools check-python-install
 The command uses a fresh artifact directory and checks distribution names and versions before
 installing. Each environment receives only its target wheel and declared dependencies. Local wheel
 constraints ensure sibling dependencies come from this build without installing unrelated members.
-Third-party runtime dependencies use the installer's configured indexes; the current example has
-none. Build backends still need an available index or cache, as with `uv build`.
+Third-party runtime dependencies use the installer's configured indexes. The four example
+components have none.
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
+The repository creator has a runtime dependency on `tomlkit`.
+<!-- END TEMPLATE CREATOR ONLY -->
+Build backends still need an available index or cache, as with `uv build`.
 Installation runs from the selected project root so uv discovers its index configuration. Pass
 credentials through uv's supported environment settings; the wheel environment is still explicitly
 selected and separate from the workspace.

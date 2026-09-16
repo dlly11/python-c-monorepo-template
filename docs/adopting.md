@@ -11,15 +11,8 @@ The following manual procedure remains available for existing checkouts and cust
 
 ## Reuse permission
 
-You may use, copy, modify, distribute, and relicense the template's files, including for commercial
-or proprietary projects. You are free to change the licensing of any template file. This permission
-does not transfer ownership of the original
-[python-c-monorepo-template repository](https://github.com/dlly11/python-c-monorepo-template);
-do not claim ownership of that original template repository. Third-party dependencies retain their
-own licensing terms.
-
-This is the template's plain-language reuse permission. No standard license or SPDX identifier is
-selected for your derived project; choose and document the terms appropriate to your own project.
+See the [template's reuse permission](https://github.com/dlly11/python-c-monorepo-template/blob/main/README.md#reuse-permission). For manual adoption, choose
+and document your project's license; the creator records the license chosen in its guide.
 
 ## Initialize CI and the first protected PR
 

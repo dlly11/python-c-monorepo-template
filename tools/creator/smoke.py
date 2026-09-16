@@ -83,6 +83,7 @@ def main() -> None:
         environment["PATH"] = str(commands_dir)
     for arguments in (
         ["--help"],
+        ["edit", "--help"],
         ["--version"],
         ["validate", "--config", str(recipe)],
         ["generate", "--config", str(recipe), "--output", str(root / "generated project")],

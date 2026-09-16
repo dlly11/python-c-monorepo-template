@@ -4,6 +4,7 @@ Create a configured Python/C monorepository through a terminal guide or saved TO
 
 ```bash
 template-create wizard
+template-create edit --config template-config.toml --output revised-config.toml
 python -m template_creator generate --config template-config.toml --output ./my-project
 ```
 

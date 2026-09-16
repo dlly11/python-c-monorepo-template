@@ -124,3 +124,84 @@ def test_duplicate_policy_checks_are_rejected(
     path.write_text(json.dumps(policy), encoding="utf-8")
     monkeypatch.setattr(github_checks, "POLICY", path)
     assert cli.main(["check-github-settings", "--repo", "owner/project"]) == 2
+
+
+@pytest.fixture
+def extended_context(
+    settings_context: tuple[ModuleType, dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> dict[str, Any]:
+    module, state = settings_context
+    state["repository"]["allow_auto_merge"] = False
+    state.update(errors=[], fail="", reads=[])
+    original_api = module.api
+
+    def api(endpoint: str) -> dict[str, Any]:
+        state["reads"].append(endpoint)
+        if state["fail"] and state["fail"] in endpoint:
+            raise RuntimeError("HTTP 403: unavailable")
+        if "/actions/permissions/" in endpoint:
+            return {
+                "default_workflow_permissions": "read",
+                "can_approve_pull_request_reviews": False,
+            }
+        if "/codeowners/errors" in endpoint:
+            return {"errors": state["errors"]}
+        return original_api(endpoint)
+
+    def items(endpoint: str) -> list[dict[str, Any]]:
+        state["reads"].append(endpoint)
+        if state["fail"] and state["fail"] in endpoint:
+            raise RuntimeError("HTTP 403: unavailable")
+        return [
+            {
+                "type": "pull_request",
+                "ruleset_source_type": "Organization",
+                "ruleset_source": "owner",
+                "ruleset_id": 42,
+                "parameters": {"required_approving_review_count": 2},
+            }
+        ]
+
+    monkeypatch.setattr(module, "api", api)
+    monkeypatch.setattr(module, "items", items)
+    return state
+
+
+def test_extended_reports_capabilities_without_enforcing_them(
+    extended_context: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["check-github-settings", "--repo", "owner/project", "--extended"]) == 0
+    output = capsys.readouterr().out
+    assert "Repository auto-merge: disabled" in output
+    assert "Organization owner" in output
+    assert "not compared with classic policy" in output
+    assert "Actions create/approve PRs setting: disabled" in output
+
+
+def test_extended_codeowners_errors_are_problems(extended_context: dict[str, Any]) -> None:
+    extended_context["errors"] = [
+        {"path": ".github/CODEOWNERS", "line": 2, "message": "Unknown owner"}
+    ]
+    assert cli.main(["check-github-settings", "--repo", "owner/project", "--extended"]) == 1
+
+
+@pytest.mark.parametrize("endpoint", ["/protection", "/rules/", "/actions/", "/codeowners/"])
+def test_extended_continues_after_unavailable_endpoint(
+    extended_context: dict[str, Any], capsys: pytest.CaptureFixture[str], endpoint: str
+) -> None:
+    extended_context["fail"] = endpoint
+    assert cli.main(["check-github-settings", "--repo", "owner/project", "--extended"]) == 2
+    output = capsys.readouterr()
+    assert "HTTP 403" in output.err
+    assert any("/rules/" in read for read in extended_context["reads"])
+    assert any("/actions/" in read for read in extended_context["reads"])
+    assert any("/codeowners/" in read for read in extended_context["reads"])
+
+
+def test_default_does_not_read_extended_endpoints(extended_context: dict[str, Any]) -> None:
+    assert cli.main(["check-github-settings", "--repo", "owner/project"]) == 0
+    assert not any(
+        fragment in read
+        for read in extended_context["reads"]
+        for fragment in ("/rules/", "/actions/", "/codeowners/")
+    )

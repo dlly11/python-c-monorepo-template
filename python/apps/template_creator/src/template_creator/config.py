@@ -27,7 +27,10 @@ VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 SLUG = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 PREFIX = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 EMAIL = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
-OWNER = re.compile(r"@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9_.-]+)?")
+OWNER = re.compile(
+    r"@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+    r"(?:_[A-Za-z0-9]+)?(?:/[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?)?"
+)
 RESERVED = {
     "con",
     "prn",
@@ -82,12 +85,16 @@ def owners(value: Any, field: str) -> None:
     if not isinstance(value, list) or not value:
         raise ValueError(f"{field}: provide at least one @user, @org/team, or email")
     for owner in value:
-        if not isinstance(owner, str) or not (OWNER.fullmatch(owner) or EMAIL.fullmatch(owner)):
+        if (
+            not isinstance(owner, str)
+            or any(ord(c) < 32 or ord(c) == 127 or c.isspace() or c in '#\\"' for c in owner)
+            or not (OWNER.fullmatch(owner) or EMAIL.fullmatch(owner))
+        ):
             raise ValueError(f"{field}: invalid owner {owner!r}")
 
 
-def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
-    """Reject omissions and typos before any output is created."""
+def validate_structure(data: dict[str, Any], snapshot: Snapshot) -> None:
+    """Require a compatible recipe whose fields can safely be presented for editing."""
     if (
         set(data) != {"schema_version", *FIELDS}
         or type(data.get("schema_version")) is not int
@@ -105,9 +112,49 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
                 ("ownership", "default"),
                 ("ownership", "rules"),
                 ("license", "year"),
+            } and not isinstance(value, str):
+                raise ValueError(f"{section}.{key}: expected text")
+    ownership = data["ownership"]
+    if not isinstance(ownership["default"], list) or any(
+        not isinstance(owner, str) for owner in ownership["default"]
+    ):
+        raise ValueError("ownership.default: expected a list of owner strings")
+    if not isinstance(ownership["rules"], list):
+        raise ValueError("ownership.rules: expected a list")
+    for rule in ownership["rules"]:
+        if (
+            not isinstance(rule, dict)
+            or set(rule) != {"pattern", "owners"}
+            or not isinstance(rule["pattern"], str)
+            or not isinstance(rule["owners"], list)
+            or any(not isinstance(owner, str) for owner in rule["owners"])
+        ):
+            raise ValueError("ownership.rules: each rule requires a pattern and owner strings")
+    if type(data["license"]["year"]) is not int:
+        raise ValueError("license.year: expected an integer")
+    if data["template"] != {
+        "version": snapshot.version,
+        "digest": snapshot.digest,
+        "source": SOURCE_URL,
+    }:
+        raise ValueError(
+            "template identity mismatch: use the original creator download, "
+            "or create a new config with this release"
+        )
+
+
+def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
+    """Reject omissions and typos before any output is created."""
+    validate_structure(data, snapshot)
+    for section, fields in FIELDS.items():
+        for key in fields:
+            if (section, key) not in {
+                ("ownership", "default"),
+                ("ownership", "rules"),
+                ("license", "year"),
                 ("license", "text"),
             }:
-                text(value, f"{section}.{key}")
+                text(data[section][key], f"{section}.{key}")
     project = data["project"]
     if not SLUG.fullmatch(project["slug"]) or project["slug"] in RESERVED:
         raise ValueError(
@@ -145,11 +192,7 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
         raise ValueError("security.contact: expected an email address or HTTPS URL")
     owners(data["ownership"]["default"], "ownership.default")
     rules = data["ownership"]["rules"]
-    if not isinstance(rules, list):
-        raise ValueError("ownership.rules: expected a list")
     for rule in rules:
-        if not isinstance(rule, dict) or set(rule) != {"pattern", "owners"}:
-            raise ValueError("ownership.rules: each rule requires pattern and owners")
         pattern = text(rule["pattern"], "ownership.rules.pattern")
         if any(c.isspace() or c in "#![]\\" for c in pattern):
             raise ValueError(
@@ -157,30 +200,23 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
             )
         owners(rule["owners"], "ownership.rules.owners")
     license = data["license"]
-    if (
-        license["choice"] not in LICENSES
-        or type(license["year"]) is not int
-        or not 1000 <= license["year"] <= 9999
-    ):
+    if license["choice"] not in LICENSES or not 1000 <= license["year"] <= 9999:
         raise ValueError("license: choose a supported license and four-digit copyright year")
-    if not isinstance(license["text"], str) or "\x00" in license["text"]:
+    if "\x00" in license["text"]:
         raise ValueError("license.text: expected text without NUL characters")
     if (license["choice"] == "Custom") != bool(license["text"].strip()):
         raise ValueError("license.text must be provided only for Custom licensing")
-    if data["template"] != {
-        "version": snapshot.version,
-        "digest": snapshot.digest,
-        "source": SOURCE_URL,
-    }:
-        raise ValueError(
-            "template identity mismatch: use the original creator download, "
-            "or create a new config with this release"
-        )
     return Config(data)
 
 
 def load(path: Path, snapshot: Snapshot) -> Config:
-    return validate(tomlkit.parse(path.read_text(encoding="utf-8")).unwrap(), snapshot)
+    return validate(load_editable(path, snapshot), snapshot)
+
+
+def load_editable(path: Path, snapshot: Snapshot) -> dict[str, Any]:
+    data = tomlkit.parse(path.read_text(encoding="utf-8")).unwrap()
+    validate_structure(data, snapshot)
+    return data
 
 
 def serialize(config: Config) -> str:
