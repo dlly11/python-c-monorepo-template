@@ -13,25 +13,32 @@ from template_creator.config import Config, serialize
 from template_creator.snapshot import PACKAGE, SOURCE_URL, Snapshot
 
 CREATOR = "monorepo-template-creator"
-BEGIN = "# BEGIN TEMPLATE CREATOR ONLY"
-END = "# END TEMPLATE CREATOR ONLY"
 
 
-def without_creator(text: str) -> str:
-    """Remove marked upstream-only integration blocks, checking paired anchors."""
-    if text.count(BEGIN) != text.count(END):
-        raise ValueError("unbalanced creator-only template anchors")
-    text = re.sub(
-        r"(?s)<!-- BEGIN TEMPLATE CREATOR ONLY -->.*?<!-- END TEMPLATE CREATOR ONLY -->\n",
-        "",
-        text,
-    )
-    return re.sub(
-        r"(?m)^[ \t]*# BEGIN TEMPLATE CREATOR ONLY\n.*?^[ \t]*# END TEMPLATE CREATOR ONLY\n",
-        "",
-        text,
-        flags=re.DOTALL,
-    )
+def without_creator(text: str, source: str = "template") -> str:
+    """Remove paired upstream-only blocks; reject ambiguous or incomplete markers."""
+    markers = {
+        f"{prefix}{kind} TEMPLATE CREATOR ONLY{suffix}": (kind, prefix)
+        for prefix, suffix in (("# ", ""), ("<!-- ", " -->"))
+        for kind in ("BEGIN", "END")
+    }
+    active = None
+    result = []
+    for line in text.splitlines(keepends=True):
+        marker = markers.get(line.strip())
+        if marker:
+            kind, style = marker
+            if kind == "BEGIN" and active is None:
+                active = style
+            elif kind == "END" and active == style:
+                active = None
+            else:
+                raise ValueError(f"{source}: unbalanced or nested creator-only template anchors")
+        elif active is None:
+            result.append(line)
+    if active is not None:
+        raise ValueError(f"{source}: unbalanced creator-only template anchors")
+    return "".join(result)
 
 
 def license_text(config: Config) -> str:
@@ -126,7 +133,7 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
         if name == "uv.lock":
             files[name] = source
             continue
-        content = renamed(without_creator(source.decode("utf-8")))
+        content = renamed(without_creator(source.decode("utf-8"), old_name))
         if name == "docs/index.md":
             content = content.replace("../python/apps/template_creator/docs/index\n", "")
         if name == "tools/doxygen/Doxyfile":

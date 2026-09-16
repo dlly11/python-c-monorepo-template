@@ -98,10 +98,11 @@ The release workflow runs after successful **post-merge verification on the curr
    repeated after merging. Only then may Release Please open or update a release PR.
 2. The pull request updates `version.txt`, `CHANGELOG.md`, the root and product Python project
    versions, the CMake version, and the Release Please manifest.
-3. The workflow checks out the managed branch, regenerates `uv.lock`, commits it when changed, and
-   explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting release commit. The
-   title workflow receives the release PR number.
-4. A maintainer reviews and merges the release pull request after its required checks pass.
+3. The workflow checks out the managed branch, regenerates `uv.lock`, and commits it when changed.
+   With the default token it explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting
+   release commit. With an approved App or PAT, ordinary PR events run those checks instead.
+4. A maintainer merges the release pull request, or optional auto-merge completes it after all
+   required checks and reviews pass. Auto-merge supports every release version, including majors.
 5. After the release PR is merged and post-merge verification succeeds, Release Please creates the `vX.Y.Z` tag and
    GitHub Release.
 6. The same workflow builds wheels and source distributions for every product workspace member,
@@ -210,11 +211,70 @@ first-use test, the update PR itself can use a newly enabled method once all its
 pass: post-merge CI checks out the updated verifier from that PR. Merge this update before using
 the new method on other PRs; the older verifier would reject them.
 
-The workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions. GitHub suppresses
-ordinary workflow events caused by that token, so the release workflow deliberately invokes
-`workflow_dispatch` for both CI and title validation after synchronizing the release branch.
-The title workflow uses only read access to contents and pull requests. No long-lived personal
-access token is required. Manual dispatch requires the workflow to exist on the default branch.
+By default, the workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions.
+Token-created or updated PRs produce approval-required workflow runs; other token-generated
+events, including pushes, do not start workflows. Explicit `workflow_dispatch` calls do start
+workflows, so Release dispatches CI and title validation after synchronizing its branch.
+Approving the additional automatic PR runs can duplicate that work. Inspect the dispatched runs
+before approving another copy. See [GitHub's token event behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
+The title workflow uses only read access to contents and pull requests. No additional credential
+is required for this default mode. Manual dispatch requires the workflow on the default branch.
+
+### Optional unattended releases
+
+Keep the defaults for repositories that cannot use additional automation credentials. To remove
+the token-specific workflow approval and optionally merge releases automatically, configure an
+enterprise-approved App or PAT under **Settings > Secrets and variables > Actions**:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `RELEASE_AUTH_MODE` | Variable | `github-token` (default), `app`, or `pat` |
+| `RELEASE_AUTO_MERGE` | Variable | `false` (default) or `true` |
+| `RELEASE_APP_CLIENT_ID` | Variable | Installed App's client ID; required for `app` |
+| `RELEASE_APP_PRIVATE_KEY` | Secret | App private key; required for `app` |
+| `RELEASE_PAT` | Secret | Approved repository-scoped token; required for `pat` |
+
+For an App, install it on this repository with **Contents**, **Pull requests**, and **Issues**
+read/write permissions. The workflow uses the official, SHA-pinned
+[App token action](https://github.com/actions/create-github-app-token), scopes its token to this
+repository, and revokes it when the preparation job ends. Registration supplies an automation
+identity; no hosted application code or server is required. An existing approved App can be used.
+For PAT mode, prefer a fine-grained token with those same permissions on this repository and an
+account allowed to perform the required operations. Follow enterprise approval and expiry policy;
+rotate or renew it before expiry. Never put either credential in a creation recipe.
+
+App/PAT mode uses the selected identity for Release Please, lockfile pushes, and auto-merge requests.
+PR events start CI and title checks without the default token's approval requirement. Release does
+not also dispatch them. A subsequent lockfile commit supersedes the initial PR run; ordinary CI
+concurrency cancels outdated work. Artifact jobs continue to use their own `GITHUB_TOKEN`.
+
+Before setting `RELEASE_AUTO_MERGE=true`:
+
+1. Configure App or PAT mode and all required credentials. Unset or unused secrets do not select
+   an identity automatically; invalid selected configuration fails before release writes.
+2. Enable **Allow auto-merge** in repository settings and ensure squash merging is enabled.
+3. Confirm all intended required checks, strict branch updates, and administrator enforcement.
+   Run the settings audit below; include the creator checks in this upstream repository.
+4. Keep review requirements appropriate for your team. Auto-merge waits for them; it does not
+   approve PRs, bypass protection, or remove deployment approvals.
+
+Only the open, same-repository Release Please PR targeting `main`, on its default managed branch
+`release-please--branches--main`, with the pending-release label and synchronized head is eligible.
+GitHub performs a squash merge using its conventional release title. Major releases are included;
+ordinary PRs are unaffected. A head change between validation and the merge request rejects that
+request. The resulting main push must still pass merged-PR verification before publishing assets.
+Keep the default release branch/title convention when using this feature. Merge queues are outside
+the current CI design; rulesets requiring them need a separate CI integration.
+
+Missing or expired credentials, disabled repository auto-merge, and permission failures are shown
+in the preparation job. Correct the setup and retry release preparation after main's verified CI
+passes. There is no fallback to another credential and no administrator merge bypass.
+
+To stop future automatic merge requests, set `RELEASE_AUTO_MERGE=false`. To cancel an already
+queued request, also run `gh pr merge PR_NUMBER --disable-auto` (or disable it in the PR UI).
+Changing the variable alone does not cancel existing requests. To return fully to the default
+token path, also set `RELEASE_AUTH_MODE=github-token`. Test activation through a complete release:
+final PR checks, automatic merge, main verification, release creation, and asset publication.
 
 The files `tools/release-please/config.json` and `tools/release-please/manifest.json` are Release
 Please policy and state. Change their structure only as part of an intentional release-policy
@@ -252,6 +312,24 @@ changing branch or check names. The audit is not a CI job and never applies sett
 This policy covers classic branch protection and repository merge settings on GitHub.com. It does
 not audit release tag restrictions, Pages, Actions workflow permissions, or organization rulesets.
 Those remain separate setup responsibilities described above.
+
+For additional read-only setup diagnostics:
+
+```bash
+uv run repo-tools check-github-settings --extended --repo OWNER/REPO
+```
+
+Extended mode lists active rules applying to the default branch and their sources, Actions workflow
+permissions, repository auto-merge availability, and GitHub-reported CODEOWNERS errors. Rulesets
+and capability settings are informational, not a replacement for the classic policy comparison.
+The branch-rules API includes active inherited rules, but not disabled or evaluation-only rules.
+See [GitHub's effective branch rules API](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch).
+
+The audit completes independent reads even if another endpoint is inaccessible. Exit `1` also
+includes CODEOWNERS errors; exit `2` means at least one requested check could not complete and takes
+precedence over detected drift. A successful exit certifies the comparisons and reads described
+here, not full enterprise-policy compliance. An unavailable classic protection endpoint remains
+unassessed even when rulesets are visible. No settings are changed and this is not a CI job.
 
 ## Recovering missing release assets
 

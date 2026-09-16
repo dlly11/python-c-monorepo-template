@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from template_creator.config import LICENSES, Config, owners, save, validate
+from template_creator.config import LICENSES, Config, load_editable, owners, save, validate
 from template_creator.generate import generate
 from template_creator.snapshot import SOURCE_URL, Snapshot
 
@@ -62,11 +63,16 @@ def summary(config: Config) -> str:
     )
 
 
+def default_docs_url(owner: str, slug: str) -> str:
+    return f"https://{owner}.github.io/{slug}/"
+
+
 def section(number: int, data: dict[str, Any]) -> None:
     """Edit one section while retaining previous answers as defaults."""
     if number == 1:
         old = data.get("project", {})
         name = ask("Project display name", old.get("name", ""))
+        print("The repository slug is the name in OWNER/REPOSITORY, for example acme-tools.")
         slug = ask(
             "Repository slug", old.get("slug", re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-"))
         )
@@ -80,17 +86,21 @@ def section(number: int, data: dict[str, Any]) -> None:
             "version": ask("Initial version", old.get("version", "0.1.0")),
         }
         if "github" in data:
+            github = data["github"]
+            if github["docs_url"] == default_docs_url(github["owner"], github["repository"]):
+                github["docs_url"] = default_docs_url(github["owner"], slug)
             data["github"]["repository"] = slug
     elif number == 2:
         old = data.get("github", {})
         owner = ask("GitHub repository owner (user or organization)", old.get("owner", ""))
         slug = data["project"]["slug"]
+        docs_url = old.get("docs_url", default_docs_url(owner, slug))
+        if old and docs_url == default_docs_url(old["owner"], old["repository"]):
+            docs_url = default_docs_url(owner, slug)
         data["github"] = {
             "owner": owner,
             "repository": slug,
-            "docs_url": ask(
-                "Documentation URL", old.get("docs_url", f"https://{owner}.github.io/{slug}/")
-            ),
+            "docs_url": ask("Documentation URL", docs_url),
         }
     elif number == 3:
         old = data.get("author", {})
@@ -174,25 +184,15 @@ def section(number: int, data: dict[str, Any]) -> None:
         }
 
 
-def wizard(snapshot: Snapshot, path: Path) -> None:
-    """Save first, then reload the exact persisted recipe for generation."""
-    from template_creator.config import load
-
-    if path.exists():
+def require_new_config(path: Path) -> None:
+    if os.path.lexists(path):
         raise ValueError(f"config already exists: {path}; choose another --config path")
-    print(
-        "Create a Python/C repository in six steps. Names, emails, ownership, and license\n"
-        "will be written to public project files. Do not enter passwords or tokens.\n"
-        "Creation needs uv >=0.10.9; it may download Python, metadata, and formatters.\n"
-        "Ctrl+C cancels. Nothing is generated until the configuration is saved.\n"
-    )
-    data: dict[str, Any] = {
-        "schema_version": 1,
-        "template": {"version": snapshot.version, "digest": snapshot.digest, "source": SOURCE_URL},
-    }
-    for number in range(1, 7):
-        print(f"\nStep {number}/6")
-        section(number, data)
+    if not path.parent.is_dir():
+        raise ValueError(f"config parent does not exist: {path.parent}")
+
+
+def review(snapshot: Snapshot, data: dict[str, Any], path: Path) -> None:
+    """Share section editing and full validation between new and existing recipes."""
     while True:
         try:
             config = validate(data, snapshot)
@@ -210,6 +210,34 @@ def wizard(snapshot: Snapshot, path: Path) -> None:
         if choice in {"1", "2", "3", "4", "5", "6"}:
             section(int(choice), data)
     print(f"Saved {path}")
+
+
+def edit(snapshot: Snapshot, source: Path, output: Path) -> None:
+    """Edit a compatible saved recipe into a new file without generating a project."""
+    require_new_config(output)
+    data = load_editable(source, snapshot)
+    review(snapshot, data, output)
+
+
+def wizard(snapshot: Snapshot, path: Path) -> None:
+    """Save first, then reload the exact persisted recipe for generation."""
+    from template_creator.config import load
+
+    require_new_config(path)
+    print(
+        "Create a Python/C repository in six steps. Names, emails, ownership, and license\n"
+        "will be written to public project files. Do not enter passwords or tokens.\n"
+        "Creation needs uv >=0.10.9; it may download Python, metadata, and formatters.\n"
+        "Ctrl+C cancels. Nothing is generated until the configuration is saved.\n"
+    )
+    data: dict[str, Any] = {
+        "schema_version": 1,
+        "template": {"version": snapshot.version, "digest": snapshot.digest, "source": SOURCE_URL},
+    }
+    for number in range(1, 7):
+        print(f"\nStep {number}/6")
+        section(number, data)
+    review(snapshot, data, path)
     if ask_yes_no("Create repository now?", default=True):
         destination = Path(ask("New destination directory", f"./{data['project']['slug']}"))
         generate(snapshot, load(path, snapshot), destination)

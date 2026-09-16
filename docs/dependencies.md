@@ -82,6 +82,9 @@ To upgrade the backend, edit that one root constraint to the chosen tested versi
 ```text
 uv lock
 uv sync --locked --all-packages --reinstall-package example-core --reinstall-package example-package-a --reinstall-package example-package-b --reinstall-package example-package-a-cli --reinstall-package monorepo-repo-tools
+# BEGIN TEMPLATE CREATOR ONLY
+uv sync --locked --all-packages --reinstall-package monorepo-template-creator
+# END TEMPLATE CREATOR ONLY
 uv run repo-tools check-workspace
 uv run repo-tools check-python
 uv run pytest

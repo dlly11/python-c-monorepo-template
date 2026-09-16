@@ -17,6 +17,7 @@ COMMANDS = (
     "check-pr-title",
     "check-python",
     "check-python-install",
+    "check-release-automation",
     "check-release-readiness",
     "check-versions",
     "check-workspace",

@@ -73,10 +73,28 @@ saving. Existing configuration files are never overwritten; use `wizard --config
 Ctrl+C cancels. A config already saved remains available if generation fails or is cancelled.
 Yes/no prompts also accept `y` and `n`; unrecognized answers prompt again.
 
+To revise a saved recipe with the same creator release:
+
+```bash
+template-create edit --config template-config.toml --output revised-config.toml
+template-create generate --config revised-config.toml --output ./revised-project
+```
+
+Editing opens the same review and section choices and saves a new file; it does not generate a
+project or overwrite either file. It can repair invalid field values in a structurally valid
+recipe. Malformed TOML, unknown fields, unsupported schemas, and template identity mismatches
+must be resolved before editing. Cancellation leaves the original file intact. Editing requires
+a terminal, and the output's parent directory must already exist.
+
 To correct CODEOWNERS, edit section 5. Enter the complete list of owners you want to keep
 to replace a displayed list; pressing Enter keeps it unchanged. At least one default owner
 is required. Each existing path rule has keep, edit, and remove options, so you can delete
 one rule without re-entering the others. Invalid owner syntax is rejected at the owner prompt.
+Managed usernames such as `@ada_acme` are supported. Use the username for Enterprise Managed
+Users: GitHub does not resolve CODEOWNERS email entries to managed accounts. For other accounts,
+an email must belong to the intended GitHub account. Owners need write access; teams must also be
+visible. After pushing, use `repo-tools check-github-settings --extended` to read GitHub's own
+CODEOWNERS diagnostics. See [GitHub's ownership rules](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners).
 
 All contact details in the recipe are intended for published project files. Do not put tokens,
 passwords, private keys, or other credentials in the recipe.
@@ -108,6 +126,18 @@ The shared prefix `acme_lab` yields `acme-lab-core`, `acme_lab_core`, C symbols 
 `acme_lab_`, macros beginning `ACME_LAB_`, `<acme_lab/core.h>`, `acme_lab::core`, and the
 CMake package `AcmeLab`. Both CLIs become `acme-lab-package-a-cli`. Component directories
 remain `core`, `package_a`, `package_b`, and `package_a_cli`.
+
+| Name | Example | Meaning |
+| --- | --- | --- |
+| Repository slug | `research-tools` | Repository name in `acme/research-tools`; not the owner or full URL |
+| Shared prefix | `acme_lab` | Naming input shared by Python and C components |
+| Distribution | `acme-lab-core` | Name used when installing a Python package |
+| Import namespace | `acme_lab_core` | Name used in Python `import` statements |
+| C prefix | `acme_lab_` | Prefix for exported C symbols |
+| CMake package | `AcmeLab` | Name passed to `find_package` |
+
+Changing the slug or owner in the guide updates a documentation URL that still matches the
+previous GitHub Pages default. A custom URL remains unchanged.
 
 The initial version defaults to `0.1.0`. For this new project, dependency lower bounds between
 workspace members start at that baseline. Private `repo-tools` keeps its independent version.

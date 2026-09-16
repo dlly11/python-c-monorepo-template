@@ -11,6 +11,7 @@ uv sync --locked --all-packages
 uv run repo-tools --help
 uv run repo-tools check-versions
 uv run repo-tools doctor --profile python
+uv run repo-tools check-github-settings --extended
 ```
 
 ## Checkout and Python environment
@@ -72,6 +73,10 @@ Relative file arguments are relative to the working directory, regardless of the
 The central CLI is the only command entry point; command modules do not need their own `main()`.
 Package-level modules contain shared helpers. Update the relevant workflow guide when adding a
 user-facing operation; CLI help remains the reference for command options.
+
+`check-release-automation` is the workflow's read-only validator for explicit release credentials
+and the managed PR/head eligible for auto-merge. It never merges a PR or changes GitHub settings;
+the release workflow owns those writes. See the release guide for configuration and activation.
 
 See the [workstation guide](../../docs/workstation.md), [testing guide](../../docs/testing.md), and
 [release guide](../../docs/releases.md) for workflows.
