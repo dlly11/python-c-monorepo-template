@@ -67,6 +67,9 @@ jobs:
       - run: uv run repo-tools check-python
       - run: uv run repo-tools check-versions
       - run: uv run repo-tools check-python-install
+      # BEGIN TEMPLATE CREATOR ONLY
+      - run: uv run python tools/creator/check_inventory.py
+      # END TEMPLATE CREATOR ONLY
       - name: Record tested PR contents
         if: github.event_name != 'push'
         run: python tools/repo_tools/run.py check-merge --record build/pr-validation/validation.json
@@ -219,3 +222,42 @@ jobs:
       - run: cmake --preset asan
       - run: cmake --build --preset asan
       - run: ctest --preset asan
+
+  # BEGIN TEMPLATE CREATOR ONLY
+  creator:
+    name: Repository creator (${{ matrix.target }})
+    if: *run-quality
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, target: linux-x64}
+          - {os: ubuntu-22.04-arm, target: linux-arm64}
+          - {os: windows-2022, target: windows-x64}
+          - {os: windows-11-arm, target: windows-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+          - {os: macos-14, target: macos-arm64}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - run: uv sync --locked --all-packages --group creator-build
+      - run: uv run --no-sync python tools/creator/build.py --target ${{ matrix.target }}
+      - name: Install documentation prerequisites for generated-project validation
+        if: matrix.target == 'linux-x64'
+        run: sudo apt-get update && sudo apt-get install --yes doxygen
+      - name: Validate a complete generated project
+        if: matrix.target == 'linux-x64'
+        run: uv run --no-sync python tools/creator/smoke.py --work-dir build/creator/full --full
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: creator-${{ matrix.target }}
+          path: dist/creator/*
+          if-no-files-found: error
+  # END TEMPLATE CREATOR ONLY

@@ -1,5 +1,14 @@
 # Adopt and rename the template
 
+## Create a configured repository
+
+Use the [repository creator](../python/apps/template_creator/docs/index.md) to download an
+executable or run the Python command. Its step-by-step guide saves your identity, licensing,
+ownership, and naming choices to TOML, then generates a new repository with a valid lockfile.
+The creator supports Linux, Windows, and macOS on x64 and ARM64.
+
+The following manual procedure remains available for existing checkouts and custom layouts.
+
 ## Reuse permission
 
 You may use, copy, modify, distribute, and relicense the template's files, including for commercial

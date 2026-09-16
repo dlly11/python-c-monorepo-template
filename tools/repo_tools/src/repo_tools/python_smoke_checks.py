@@ -25,6 +25,17 @@ class SmokeCheck:
 
 # Keep one observable API example per independently delivered component.
 SMOKE_CHECKS = {
+    # BEGIN TEMPLATE CREATOR ONLY
+    "monorepo-template-creator": SmokeCheck(
+        "template_creator",
+        "from template_creator.snapshot import load\nassert load().version == expected_version\n",
+        commands=(
+            SmokeCommand("template-create", ("--help",)),
+            SmokeCommand("template-create", ("--version",)),
+            SmokeCommand("python", ("-I", "-m", "template_creator", "--help")),
+        ),
+    ),
+    # END TEMPLATE CREATOR ONLY
     "example-core": SmokeCheck(
         "example_core",
         """

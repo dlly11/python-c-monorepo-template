@@ -29,7 +29,13 @@
         {"context": "Native build (macos-latest)", "app_id": 15368},
         {"context": "Native build (windows-latest)", "app_id": 15368},
         {"context": "Native static analysis", "app_id": 15368},
-        {"context": "Native sanitizers", "app_id": 15368}
+        {"context": "Native sanitizers", "app_id": 15368},
+        {"context": "Repository creator (linux-x64)", "app_id": 15368},
+        {"context": "Repository creator (linux-arm64)", "app_id": 15368},
+        {"context": "Repository creator (windows-x64)", "app_id": 15368},
+        {"context": "Repository creator (windows-arm64)", "app_id": 15368},
+        {"context": "Repository creator (macos-x64)", "app_id": 15368},
+        {"context": "Repository creator (macos-arm64)", "app_id": 15368}
       ]
     },
     "required_linear_history": {"enabled": false},

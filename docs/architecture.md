@@ -144,3 +144,16 @@ Keep cross-language communication at explicit boundaries. If Python calls a C ex
 the executable's command-line or protocol contract in an integration suite. If native bindings
 are eventually required, create a dedicated Python distribution for that binding rather than
 making every Python package depend on the native build.
+
+<!-- BEGIN TEMPLATE CREATOR ONLY -->
+## Repository creator
+
+The upstream-only `monorepo-template-creator` application is a normal Python workspace member
+with the repository's release version. It has no dependency on the example packages or private
+maintenance package. Its wheel includes a versioned snapshot assembled from explicitly classified
+canonical files during standard PEP 517 builds; source distributions retain that snapshot.
+
+The renderer updates the four example components and removes the creator's registrations,
+workflows, and documentation from generated projects. This keeps the working repository as the
+single template source. See the [creator guide](../python/apps/template_creator/docs/index.md).
+<!-- END TEMPLATE CREATOR ONLY -->

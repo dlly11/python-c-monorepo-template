@@ -19,12 +19,14 @@ members = [
 
 [tool.uv.sources]
 monorepo-repo-tools = { path = "tools/repo_tools", editable = true }
+monorepo-template-creator = { workspace = true }
 example-core = { workspace = true }
 example-package-a = { workspace = true }
 example-package-b = { workspace = true }
 example-package-a-cli = { workspace = true }
 
 [dependency-groups]
+creator-build = ["pyinstaller==6.22.3"]
 test = [
   "pytest>=8.4",
   "pytest-cov>=6.2",
@@ -71,10 +73,13 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
 "tools/repo_tools/**" = ["S603", "S607"]
+"python/apps/template_creator/**" = ["S603", "S607"]
+"tools/creator/**" = ["S603", "S607"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
   "repo_tools",
+  "template_creator",
   "example_core",
   "example_package_a",
   "example_package_a_cli",
@@ -95,6 +100,7 @@ xfail_strict = true
 [tool.coverage.run]
 branch = true
 source = [
+  "template_creator",
   "example_core",
   "example_package_a",
   "example_package_b",

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "_build_backend"
+backend-path = ["."]
+
+[project]
+name = "monorepo-template-creator"
+version = "1.0.3"
+description = "Guided creation of configured Python and C monorepositories."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["tomlkit>=0.13.2,<1"]
+
+[project.scripts]
+template-create = "template_creator.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+template_creator = ["py.typed", "inventory.json", "licenses/*.txt", "_template.zip"]
