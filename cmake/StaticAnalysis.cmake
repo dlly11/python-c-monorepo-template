@@ -52,21 +52,27 @@ function(monorepo_add_clang_format_targets)
     "${PROJECT_SOURCE_DIR}/native/*.h"
   )
 
-  _monorepo_find_tool(clang_format_executable clang-format)
-  if(NOT clang_format_executable)
-    message(STATUS "clang-format not found; format-c targets will not be available")
+  _monorepo_find_tool(uv_executable uv)
+  if(NOT uv_executable)
+    message(STATUS "uv not found; format-c targets will not be available")
     return()
   endif()
 
   add_custom_target(
     format-c
-    COMMAND "${clang_format_executable}" -i ${monorepo_native_sources}
+    COMMAND
+      "${uv_executable}" run --locked --project "${PROJECT_SOURCE_DIR}"
+      clang-format -i ${monorepo_native_sources}
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Formatting first-party native sources with clang-format"
     VERBATIM
   )
   add_custom_target(
     format-c-check
-    COMMAND "${clang_format_executable}" --dry-run --Werror ${monorepo_native_sources}
+    COMMAND
+      "${uv_executable}" run --locked --project "${PROJECT_SOURCE_DIR}"
+      clang-format --dry-run --Werror ${monorepo_native_sources}
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Checking first-party native formatting with clang-format"
     VERBATIM
   )

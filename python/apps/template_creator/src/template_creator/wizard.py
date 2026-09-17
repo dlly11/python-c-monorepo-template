@@ -11,12 +11,14 @@ from typing import Any
 from template_creator.config import (
     LICENSES,
     MAX_PREFIX_LENGTH,
+    MAX_SLUG_LENGTH,
     Config,
     load_editable,
     owners,
     save,
     validate,
     validate_prefix,
+    validate_slug,
 )
 from template_creator.generate import generate
 from template_creator.snapshot import SOURCE_URL, Snapshot
@@ -91,9 +93,17 @@ def section(number: int, data: dict[str, Any]) -> None:
         old = data.get("project", {})
         name = ask("Project display name", old.get("name", ""))
         print("The repository slug is the name in OWNER/REPOSITORY, for example acme-tools.")
-        slug = ask(
-            "Repository slug", old.get("slug", re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-"))
-        )
+        while True:
+            slug = ask(
+                f"Repository slug (maximum {MAX_SLUG_LENGTH} characters)",
+                old.get("slug", re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")),
+            )
+            try:
+                validate_slug(slug)
+            except ValueError as error:
+                print(error)
+            else:
+                break
         description = ask("One-line description", old.get("description", ""))
         while True:
             prefix = ask(

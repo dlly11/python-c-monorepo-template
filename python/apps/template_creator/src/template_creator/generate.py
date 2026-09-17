@@ -61,18 +61,34 @@ def host_environment() -> dict[str, str]:
     return environment
 
 
+def diagnostics(*values: str | bytes | None) -> str:
+    """Timeouts may carry byte output even when subprocess text mode is enabled."""
+    return "\n".join(
+        value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+        for value in values
+        if value
+    )
+
+
 def run(command: list[str], root: Path, *, timeout: int = 300) -> None:
     """Use argument arrays and expose useful errors without a shell."""
-    with host_libraries():
-        result = subprocess.run(
-            command,
-            cwd=root,
-            env=host_environment(),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
+    try:
+        with host_libraries():
+            result = subprocess.run(
+                command,
+                cwd=root,
+                env=host_environment(),
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
+            )
+    except subprocess.TimeoutExpired as error:
+        detail = diagnostics(error.stdout, error.stderr)
+        raise ValueError(
+            f"{subprocess.list2cmdline(command)} timed out after {timeout} seconds"
+            + (f"\n{detail}" if detail else "")
+        ) from error
     if result.returncode:
         raise ValueError(f"{' '.join(command)} failed:\n{result.stdout}{result.stderr}")
 
@@ -99,12 +115,8 @@ def require_uv() -> str:
             if isinstance(error, subprocess.CalledProcessError)
             else "timed out after 10 seconds"
         )
-        output = [
-            value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
-            for value in (error.stdout, error.stderr)
-            if value
-        ]
-        detail = "\n" + "\n".join(output) if output else ""
+        output = diagnostics(error.stdout, error.stderr)
+        detail = "\n" + output if output else ""
         raise ValueError(f"uv version check at {uv} {reason}{detail}") from error
     except OSError as error:
         raise ValueError(f"cannot run uv version check at {uv}: {error}") from error
@@ -139,7 +151,10 @@ def generate(snapshot: Snapshot, config: Config, output: Path) -> None:
         run([uv, "lock"], root)
         python = (root / ".python-version").read_text().strip()
         packages = tomllib.loads((root / "uv.lock").read_text())["package"]
-        ruff_version = next(package["version"] for package in packages if package["name"] == "ruff")
+        versions = {
+            package["name"]: package["version"] for package in packages if "version" in package
+        }
+        ruff_version = versions["ruff"]
         ruff = [uv, "tool", "run", "--python", python, "--from", f"ruff=={ruff_version}", "ruff"]
         print("Formatting renamed Python and native sources...", flush=True)
         # Renaming can create long lines which only the formatter can repair.
@@ -160,7 +175,7 @@ def generate(snapshot: Snapshot, config: Config, output: Path) -> None:
                 "--python",
                 python,
                 "--from",
-                "clang-format==21.1.8",
+                f"clang-format=={versions['clang-format']}",
                 "clang-format",
                 "-i",
                 *native,

@@ -15,6 +15,25 @@ from template_creator.snapshot import PACKAGE, SOURCE_URL, Snapshot
 CREATOR = "monorepo-template-creator"
 
 
+def python_assignment(key: str, value: str) -> str:
+    """Emit exact string values that remain lint-clean after Python formatting."""
+    literal = json.dumps(value, ensure_ascii=False)
+    if len(f"{key} = {literal}".encode()) <= 100:
+        return f"{key} = {literal}"
+    chunks: list[str] = []
+    chunk = ""
+    for character in value:
+        # UTF-8 byte length conservatively bounds display width for wide Unicode.
+        # Reserve four columns for indentation and count escaped characters too.
+        if len(json.dumps(chunk + character, ensure_ascii=False).encode("utf-8")) > 96:
+            chunks.append(json.dumps(chunk, ensure_ascii=False))
+            chunk = ""
+        chunk += character
+    if chunk:
+        chunks.append(json.dumps(chunk, ensure_ascii=False))
+    return f"{key} = (\n" + "".join(f"    {part}\n" for part in chunks) + ")"
+
+
 def without_creator(text: str, source: str = "template") -> str:
     """Remove paired upstream-only blocks; reject ambiguous or incomplete markers."""
     markers = {
@@ -194,9 +213,7 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
             for key, value in values.items():
                 content, count = re.subn(
                     rf"(?m)^{key} = .*?$",
-                    lambda _, key=key, value=value: (
-                        f"{key} = {json.dumps(value, ensure_ascii=False)}"
-                    ),
+                    lambda _, key=key, value=value: python_assignment(key, value),
                     content,
                 )
                 if count != 1:

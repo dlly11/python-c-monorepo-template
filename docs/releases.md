@@ -7,6 +7,20 @@ A release is tagged `vX.Y.Z`.
 The private `monorepo-repo-tools` distribution is outside workspace membership. It has an
 independent version and is excluded from product version updates and release artifacts.
 
+## Release recovery
+
+Start with the failed stage. Its workflow logs explain the cause; the table selects the retry
+that preserves successful work. Release creation and PR preparation also write job summaries
+with the available release or PR link. A created release does not mean all asset uploads finished.
+
+| What failed? | What to do |
+| --- | --- |
+| Checks on an open release PR | Follow [release PR approval and retry guidance](github-setup.md#approving-and-retrying-release-pr-checks); retry authoritative validation before its delegating check. |
+| **Create GitHub release**, before a release exists | Fix the reported cause and follow the [manual release retry](#automated-release-sequence). If CI evidence expired, use the recovery row below. |
+| **Prepare release PR** | Fix the reported cause and retry that failed job. Successful asset jobs need no retry; see [release job recovery](#recovering-missing-release-assets). |
+| Merged PR evidence expired or is missing | Run fresh full CI on current main and explicitly select it using [evidence recovery](#recovering-expired-ci-evidence). |
+| A release exists but assets are missing | Retry the original failed asset job; use [asset recovery](#recovering-missing-release-assets) if the original run is unavailable. A new Release dispatch does not restore assets. |
+
 ## Sources of version metadata
 
 `version.txt` is the canonical human-readable version. The same value is committed in several
@@ -92,7 +106,6 @@ gh workflow run pr-title.yml --ref YOUR_PR_BRANCH -f pr-number=123
 The files `tools/release-please/config.json` and `tools/release-please/manifest.json` are Release
 Please policy and state. Change their structure only as part of an intentional release-policy
 migration.
-
 
 The release workflow runs after successful **post-merge verification on the current `main` commit**:
 

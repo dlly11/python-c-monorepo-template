@@ -29,6 +29,7 @@ VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 SLUG = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 PREFIX = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 MAX_PREFIX_LENGTH = 32
+MAX_SLUG_LENGTH = 100
 EMAIL = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
 OWNER = re.compile(
     r"@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
@@ -88,6 +89,14 @@ def https_url(value: str) -> bool:
         and not (parsed.username or parsed.password or parsed.query or parsed.fragment)
         and not any(c.isspace() or c in '<>"\\' for c in value)
     )
+
+
+def validate_slug(slug: str) -> None:
+    if len(slug) > MAX_SLUG_LENGTH or not SLUG.fullmatch(slug) or slug in RESERVED:
+        raise ValueError(
+            f"project.slug: use at most {MAX_SLUG_LENGTH} characters, with lowercase "
+            "hyphen-separated words starting with a letter"
+        )
 
 
 def validate_prefix(prefix: str) -> None:
@@ -178,10 +187,7 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
             }:
                 text(data[section][key], f"{section}.{key}")
     project = data["project"]
-    if not SLUG.fullmatch(project["slug"]) or project["slug"] in RESERVED:
-        raise ValueError(
-            "project.slug: use lowercase hyphen-separated words, starting with a letter"
-        )
+    validate_slug(project["slug"])
     prefix = project["prefix"]
     validate_prefix(prefix)
     if project["slug"] in {

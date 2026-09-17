@@ -30,7 +30,9 @@ Python instead. SHA-256 checksums detect file changes; they are not publisher si
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) >=0.10.9 first. The
 executable bundles Python; `uv` may download an interpreter and dependency metadata during
 creation. Generation also obtains isolated Ruff and clang-format tools through uv. Ruff uses
-the generated lockfile's version; clang-format is pinned to 21.1.8. No compiler or Git
+the generated lockfile's version, as does clang-format, whose pin is in the root lint group.
+The generated project's hooks and CMake formatting targets use the same uv-managed formatter.
+No compiler or Git
 installation is needed to create the files.
 
 To install the release wheel as a command:
@@ -116,7 +118,9 @@ typographical errors cannot silently change the output.
 | `license` | `choice`, `holder`, integer `year`, `text` |
 | `template` | `version`, `digest`, `source`; supplied by the creator, identifying its embedded template |
 
-Slugs use lowercase hyphen-separated words, starting with a letter. Prefixes use lowercase
+Slugs use at most 100 characters, matching GitHub's repository-name limit, with lowercase
+hyphen-separated words starting with a letter. The wizard checks this at the slug prompt.
+Prefixes use lowercase
 letters/digits with optional underscores, starting with a letter; Python keywords, Windows
 reserved names, and template/tooling names are rejected. The shared prefix is limited to
 32 characters, including underscores. This is a creator naming policy, not a guarantee against
