@@ -112,6 +112,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Coverage runs the full Python suite on 3.12; omit it here to avoid duplicate tests.
       matrix:
         python-version: ["3.13", "3.14"]
     steps:
