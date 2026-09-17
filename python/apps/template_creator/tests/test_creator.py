@@ -1,6 +1,7 @@
 """Configuration, rendering, and safe output behavior."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -280,6 +281,45 @@ def test_uv_version(monkeypatch: pytest.MonkeyPatch, version: str) -> None:
     else:
         with pytest.raises(ValueError, match=r">=0\.10\.9"):
             generate.require_uv()
+
+
+@pytest.mark.parametrize("frozen", [False, True])
+@pytest.mark.parametrize("original", [None, "", "/host"])
+def test_uv_probe_sanitizes_environment(
+    monkeypatch: pytest.MonkeyPatch, frozen: bool, original: str | None
+) -> None:
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/current")
+    if original is None:
+        monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
+    else:
+        monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", original)
+    overrides = {
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "VIRTUAL_ENV",
+        "UV_PROJECT_ENVIRONMENT",
+        "UV_PROJECT",
+        "UV_WORKING_DIR",
+    }
+    for name in overrides:
+        monkeypatch.setenv(name, "/unrelated")
+    preserved = {"UV_CACHE_DIR": "/cache", "UV_OFFLINE": "1", "HTTPS_PROXY": "http://proxy:8080"}
+    for name, value in preserved.items():
+        monkeypatch.setenv(name, value)
+    parent = dict(os.environ)
+    completed = Mock(return_value=subprocess.CompletedProcess([], 0, "uv 0.12.13\n", ""))
+    monkeypatch.setattr(generate.shutil, "which", lambda _: "uv")
+    monkeypatch.setattr(generate.subprocess, "run", completed)
+
+    assert generate.require_uv() == "uv"
+
+    environment = completed.call_args.kwargs["env"]
+    assert environment.get("LD_LIBRARY_PATH") == (original if frozen else "/current")
+    assert "LD_LIBRARY_PATH_ORIG" not in environment
+    assert not overrides & environment.keys()
+    assert all(environment[name] == value for name, value in preserved.items())
+    assert dict(os.environ) == parent
 
 
 def test_packaged_snapshot(
