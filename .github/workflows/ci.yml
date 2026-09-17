@@ -281,7 +281,8 @@ jobs:
           python-version: '3.12'
           enable-cache: true
       - run: uv sync --locked --all-packages --group creator-build
-      - run: uv run --no-sync python tools/creator/build.py --target ${{ matrix.target }}
+      - name: Build and smoke-test creator executable
+        run: uv run --no-sync python tools/creator/build.py --target ${{ matrix.target }}
       - name: Install documentation prerequisites for generated-project validation
         if: matrix.target == 'linux-x64'
         run: sudo apt-get update && sudo apt-get install --yes doxygen

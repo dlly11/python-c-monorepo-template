@@ -27,7 +27,7 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
         ValueError,
         subprocess.SubprocessError,
     ) as error:
-        write_summary("CI result", selected, error=str(error))
+        write_summary("CI result", selected, error=error)
         print(f"CI validation failed: {error}", file=sys.stderr)
         return 1
     write_summary("CI result", selected, result=result)
