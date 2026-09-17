@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.2.0...v2.0.0) (2026-09-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **creator:** shared Python/C namespace prefixes are limited to 32 characters. Shorten longer prefixes when creating recipes for this release; names are never truncated automatically.
+
+### Bug Fixes
+
+* **creator:** validate naming limits and clarify repository setup ([192b1e4](https://github.com/dlly11/python-c-monorepo-template/commit/192b1e4db3287bcca2bec1b50ce1584978585eaf))
+
 ## [1.2.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.1.0...v1.2.0) (2026-09-16)
 
 
