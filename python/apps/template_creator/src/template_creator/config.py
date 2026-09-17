@@ -5,6 +5,8 @@ from __future__ import annotations
 import keyword
 import re
 from dataclasses import dataclass
+from email.errors import HeaderParseError
+from email.headerregistry import Address
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -200,6 +202,15 @@ def validate(data: dict[str, Any], snapshot: Snapshot) -> Config:
         )
     if not EMAIL.fullmatch(data["author"]["email"]):
         raise ValueError("author.email: invalid email address")
+    try:
+        # Setuptools serializes author mailboxes with the same parser. Catch errors
+        # here so a saved recipe cannot defer this failure until package building.
+        Address(addr_spec=data["author"]["email"])
+    except (ValueError, HeaderParseError) as error:
+        raise ValueError(
+            "author.email: expected a valid package-author email address; "
+            "use your public email or personal GitHub noreply address"
+        ) from error
     contact = data["security"]["contact"]
     if not (EMAIL.fullmatch(contact) or https_url(contact)):
         raise ValueError("security.contact: expected an email address or HTTPS URL")

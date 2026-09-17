@@ -126,6 +126,12 @@ Human-readable names may contain
 Unicode and punctuation. GitHub identities and CODEOWNERS are syntax-checked locally; users
 must still configure their actual repositories and grant owners access.
 
+The public author email must be a valid package-author mailbox. Ordinary addresses,
+plus-addressed emails such as `ada+research@example.com`, and personal GitHub noreply addresses
+are supported. The unquoted `41898282+github-actions[bot]@users.noreply.github.com` address used
+for bot Git commits is not valid package metadata. Validation reports `author.email` before
+generation; correct that field in the guide or saved recipe. Addresses are never rewritten.
+
 The shared prefix `acme_lab` yields `acme-lab-core`, `acme_lab_core`, C symbols beginning
 `acme_lab_`, macros beginning `ACME_LAB_`, `<acme_lab/core.h>`, `acme_lab::core`, and the
 CMake package `AcmeLab`. Both CLIs become `acme-lab-package-a-cli`. Component directories

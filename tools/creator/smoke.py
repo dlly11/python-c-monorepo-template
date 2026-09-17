@@ -27,22 +27,23 @@ def main() -> None:
     root = args.work_dir.resolve()
     root.mkdir(parents=True)
     snapshot = load()
+    slug = "acme-research-repository-with-a-long-name"
     config = validate(
         {
             "schema_version": 1,
             "project": {
                 "name": 'Acme "Research"',
-                "slug": "acme-research",
+                "slug": slug,
                 "description": "Research tools.",
                 "prefix": "acme_research_infrastructure_lab",
                 "version": "0.2.0",
             },
             "github": {
                 "owner": "acme",
-                "repository": "acme-research",
+                "repository": slug,
                 "docs_url": "https://acme.invalid/docs/",
             },
-            "author": {"name": "Ada Researcher", "email": "ada@acme.invalid"},
+            "author": {"name": "Ada Researcher", "email": "ada+research@acme.invalid"},
             "security": {"contact": "security@acme.invalid"},
             "ownership": {"default": ["@ada"], "rules": []},
             "license": {"choice": "MIT", "holder": "Acme Research", "year": 2026, "text": ""},
@@ -169,7 +170,7 @@ def main() -> None:
                 raise ValueError(f"{wheel.name}: missing license metadata/text")
             if archive.read(licenses[0]) != (project / "LICENSE").read_bytes():
                 raise ValueError(f"{wheel.name}: incorrect license text")
-    if not (project / "build/stage/share/licenses/acme-research/LICENSE").is_file():
+    if not (project / f"build/stage/share/licenses/{slug}/LICENSE").is_file():
         raise ValueError("native installation is missing its license")
 
 
