@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
+from repo_tools.components import CONFIG, legacy_config, load_components, select_component
 from repo_tools.repository_metadata import repository_version
 
 COMPONENTS = {
@@ -30,18 +32,21 @@ def expected_definitions(prefix: str, version: str) -> tuple[str, ...]:
     )
 
 
-def install_errors(prefix: Path, version: str) -> list[str]:
+def install_errors(prefix: Path, version: str | dict[Path, str]) -> list[str]:
     """Describe missing, stale, or unwanted installed files."""
     errors: list[str] = []
 
     for relative_path, macro_prefix in COMPONENTS.items():
+        if isinstance(version, dict) and relative_path not in version:
+            continue
+        expected_version = version[relative_path] if isinstance(version, dict) else version
         header = prefix / relative_path
         if not header.is_file():
             errors.append(f"missing generated version header: {relative_path}")
             continue
 
         contents = header.read_text(encoding="utf-8")
-        for definition in expected_definitions(macro_prefix, version):
+        for definition in expected_definitions(macro_prefix, expected_version):
             if re.search(rf"^{re.escape(definition)}$", contents, re.MULTILINE) is None:
                 errors.append(f"{relative_path}: missing {definition}")
 
@@ -90,15 +95,43 @@ def cli_errors(prefix: Path, version: str) -> list[str]:
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Register command arguments without performing any work."""
     parser.add_argument("prefix", type=Path, help="native CMake installation prefix")
+    parser.add_argument("--component", help="check one native component installation")
 
 
 def execute(args: argparse.Namespace, *, root: Path) -> int:
     """Check one native installation prefix."""
 
     try:
-        version = repository_version(root)
         prefix = args.prefix.resolve()
-        errors = install_errors(prefix, version) + cli_errors(prefix, version)
+        config = root / CONFIG
+        if not config.exists() or legacy_config(json.loads(config.read_text())):
+            version = repository_version(root)
+            errors = install_errors(prefix, version) + cli_errors(prefix, version)
+        else:
+            components = load_components(root)
+            chosen = (
+                [select_component(components, args.component)]
+                if args.component
+                else [c for c in components if c.kind == "native"]
+            )
+            if any(c.kind != "native" for c in chosen):
+                raise ValueError("select a native component")
+            versions = {
+                Path(f"include/example/{Path(c.path).name}_version.h"): c.version(root)
+                for c in chosen
+            }
+            errors = install_errors(prefix, versions)
+            version = ", ".join(f"{c.id}={c.version(root)}" for c in chosen)
+            for c in chosen:
+                if c.path.startswith("native/apps/"):
+                    errors += cli_errors(prefix, c.version(root))
+                provenance = prefix / "share" / c.id / "component-versions.txt"
+                if not provenance.is_file():
+                    errors.append(f"missing build provenance: {provenance}")
+                else:
+                    entries = provenance.read_text().splitlines()
+                    if f"{c.id}={c.version(root)}" not in entries:
+                        errors.append(f"incorrect build provenance: {provenance}")
     except (OSError, ValueError) as error:
         print(f"native install check failed: {error}", file=sys.stderr)
         return 1

@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parents[2]
 project = "Python and C Monorepo Template"
 author = "Python and C Monorepo Template contributors"
 copyright = "2026, Python and C Monorepo Template contributors"
-release = (ROOT / "version.txt").read_text(encoding="utf-8").strip()
+release = (
+    (ROOT / "version.txt").read_text(encoding="utf-8").strip()
+    if (ROOT / "version.txt").is_file()
+    else ""
+)
 version = release
 
 extensions = [
@@ -35,6 +39,7 @@ exclude_patterns = [
     "**/__pycache__/**",
     "**/*.egg-info/**",
     "README.md",
+    "**/CHANGELOG.md",
     "CHANGELOG.md",
     "tools/README.md",
     "python/**/README.md",

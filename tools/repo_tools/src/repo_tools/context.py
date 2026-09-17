@@ -5,11 +5,14 @@ from pathlib import Path
 
 
 def resolve_root(root: Path | None = None) -> Path:
-    """Require version metadata and a uv workspace; explicit roots never fall back."""
+    """Require a uv workspace and release metadata; explicit roots never fall back."""
     start = (root if root is not None else Path.cwd()).resolve()
     candidates = [start] if root is not None else [start, *start.parents]
     for candidate in candidates:
-        if not (candidate / "version.txt").is_file():
+        if not (
+            (candidate / "tools/release-please/config.json").is_file()
+            or (candidate / "version.txt").is_file()
+        ):
             continue
         try:
             with (candidate / "pyproject.toml").open("rb") as file:

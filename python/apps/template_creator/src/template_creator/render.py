@@ -112,6 +112,8 @@ def rewrite_toml(content: str, config: Config, *, root: bool, private: bool) -> 
         else dependency
         for dependency in project.get("dependencies", [])
     ]
+    if root:
+        del document["project"]
     return tomlkit.dumps(document)
 
 
@@ -129,6 +131,15 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
         "example::": config.prefix + "::",
         "example/": config.prefix + "/",
         "MonorepoTemplate": config.cmake_package,
+        **{
+            f"Example{suffix}": f"{config.cmake_package}{suffix}"
+            for suffix in ("Core", "PackageA", "PackageB", "PackageACli")
+        },
+        **{
+            f"{family}-{suffix}": f"{family}-{config.distribution_prefix}-{suffix}"
+            for family in ("python", "native")
+            for suffix in ("core", "package-a", "package-b", "package-a-cli")
+        },
         "monorepo_template": config.prefix,
         "package-a-cli": config.distribution_prefix + "-package-a-cli",
         "python-c-monorepo-template": project["slug"],
@@ -145,6 +156,8 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
     files: dict[str, bytes] = {}
     license = license_text(config)
     for old_name, source in snapshot.files.items():
+        if old_name in {"version.txt", "CHANGELOG.md"}:
+            continue
         name = renamed(old_name)
         if name in files:
             raise ValueError(f"generated path collision: {name}")
@@ -172,12 +185,9 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
             files[str(Path(name).with_name("LICENSE")).replace("\\", "/")] = license.encode()
         if name == "tools/release-please/config.json":
             release = json.loads(content)
-            entries = release["packages"]["."]["extra-files"]
-            release["packages"]["."]["extra-files"] = [
-                entry
-                for entry in entries
-                if "python/apps/template_creator/" not in entry.get("path", "")
-            ]
+            release["packages"].pop(".")
+            release.pop("bootstrap-sha", None)
+            release.pop("last-release-sha", None)
             content = json.dumps(release, indent=2) + "\n"
         if name == "tools/github/repository-policy.json":
             policy = json.loads(content)
@@ -194,7 +204,7 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
         if name == "CMakeLists.txt":
             content, count = re.subn(
                 r"VERSION \d+\.\d+\.\d+ # x-release-please-version",
-                f"VERSION {project['version']} # x-release-please-version",
+                "",
                 content,
             )
             if count != 1:
@@ -223,13 +233,17 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
         content = content.replace(default_docs, data["github"]["docs_url"].rstrip("/") + "/")
         files[name] = content.encode("utf-8")
 
-    files["version.txt"] = (project["version"] + "\n").encode()
+    release = json.loads(files["tools/release-please/config.json"])
     files["tools/release-please/manifest.json"] = (
-        json.dumps({".": project["version"]}, indent=2) + "\n"
+        json.dumps(dict.fromkeys(release["packages"], project["version"]), indent=2) + "\n"
     ).encode()
-    files["CHANGELOG.md"] = (
-        f"# Changelog\n\n## {project['version']}\n\nInitial project baseline.\n".encode()
-    )
+    for path, entry in release["packages"].items():
+        files[f"{path}/CHANGELOG.md"] = (
+            f"# Changelog\n\n## {project['version']}\n\nInitial component baseline.\n".encode()
+        )
+        if entry["release-type"] == "simple":
+            files[f"{path}/version.txt"] = (project["version"] + "\n").encode()
+            files[f"{path}/LICENSE"] = license.encode()
     files[".github/CODEOWNERS"] = (
         "# Later matching rules take precedence.\n* "
         + " ".join(data["ownership"]["default"])
@@ -249,6 +263,7 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
         "branch are accepted; no response deadline is promised.\n"
     ).encode()
     readme = files["README.md"].decode().split("## Reuse permission", 1)[0]
+    readme = "\n".join(line for line in readme.split("\n") if "├── version.txt" not in line)
     readme = re.sub(
         r"(?s)(^# .*?\n\n).*?(?=```text)",
         lambda match: match[1] + project["description"] + "\n\n",

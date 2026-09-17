@@ -209,7 +209,10 @@ def merged_pr(
     if len(parents) not in {1, 2}:
         raise ValueError(f"{commit}: expected a one-parent commit or two-parent merge commit")
     if not check_message(
-        git("show", "--no-patch", "--format=%B", commit, "--", root=root), commit[:12]
+        git("show", "--no-patch", "--format=%B", commit, "--", root=root),
+        commit[:12],
+        root=root,
+        revision=commit,
     ):
         raise ValueError("merged commit subject is not conventional")
     candidates = associated_prs(repository, commit)
@@ -229,7 +232,10 @@ def merged_pr(
         introduced = git("rev-list", f"{parents[0]}..{parents[1]}", "--", root=root).splitlines()
         for sha in introduced:
             if not check_message(
-                git("show", "--no-patch", "--format=%B", sha, "--", root=root), sha[:12]
+                git("show", "--no-patch", "--format=%B", sha, "--", root=root),
+                sha[:12],
+                root=root,
+                revision=sha,
             ):
                 raise ValueError("merged PR commit subject is not conventional")
     else:
@@ -247,7 +253,10 @@ def merged_pr(
             if len(parents) != 1:
                 raise ValueError(f"{parent}: rebased PR commits must each have one parent")
             if not check_message(
-                git("show", "--no-patch", "--format=%B", parent, "--", root=root), parent[:12]
+                git("show", "--no-patch", "--format=%B", parent, "--", root=root),
+                parent[:12],
+                root=root,
+                revision=parent,
             ):
                 raise ValueError("rebased PR commit subject is not conventional")
             integration.append(parent)

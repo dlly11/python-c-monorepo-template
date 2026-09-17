@@ -1,7 +1,7 @@
 # Python and C Monorepo Template
 
 A small working example of independently packaged Python and native C components, with shared
-quality policy, documentation, and lockstep releases. Python uses uv workspaces; native code uses
+quality policy, documentation, and independently versioned releases. Python uses uv workspaces; native code uses
 CMake and CTest. The C deliverables are independent libraries and executables.
 
 ```text
@@ -59,7 +59,7 @@ when dependencies must come from an approved local source.
 ├── CMakeLists.txt               # native build graph
 ├── CMakePresets.json            # dev, analysis, sanitizer, and release builds
 ├── pyproject.toml               # uv workspace and shared Python policy
-├── version.txt                  # canonical repository version
+├── version.txt                  # upstream template/creator version
 └── uv.lock                      # committed Python dependency lock
 ```
 

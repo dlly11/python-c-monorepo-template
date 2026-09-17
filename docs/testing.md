@@ -84,11 +84,11 @@ The reduced profile requires an open, same-repository Release Please PR targetin
 configured managed branch, a pending-release label, a conventional release title, and an unchanged
 base with successful **Merged PR verification**. Its committed changes must be exactly:
 
-- One increasing version, synchronized across `version.txt`, root/product `project.version`,
-  the literal CMake project version, and the single-root release manifest.
+- A nonempty subset of increasing component versions, synchronized only across each owner's
+  declarations and manifest entry. Unchanged components retain their metadata.
 - Only workspace version updates in `uv.lock`; dependencies, sources, hashes, and other fields
   must remain identical.
-- A new changelog entry prepended without changing existing history.
+- A new changelog entry for each changed component, prepended without changing existing history.
 
 The classifier reads the base revision's workspace metadata and runs the base revision's classifier
 code. Changes to code, workflows, dependencies, configuration, file paths/modes, or unrelated

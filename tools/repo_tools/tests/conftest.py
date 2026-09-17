@@ -47,6 +47,39 @@ def repository(
     return tmp_path
 
 
+@pytest.fixture
+def independent_repository(repository: Path) -> Path:
+    config = {
+        "separate-pull-requests": False,
+        "group-pull-request-title-pattern": "chore: release ${branch}",
+        "packages": {
+            ".": {
+                "component": "template",
+                "release-type": "simple",
+                "include-component-in-tag": False,
+                "exclude-paths": ["python/packages/core"],
+                "extra-files": [
+                    {"type": "toml", "path": "pyproject.toml", "jsonpath": "$.project.version"},
+                    {"type": "generic", "path": "CMakeLists.txt"},
+                ],
+            },
+            "python/packages/core": {"component": "python-core", "release-type": "python"},
+        },
+    }
+    directory = repository / "tools/release-please"
+    directory.mkdir(parents=True)
+    (directory / "config.json").write_text(json.dumps(config))
+    (directory / "manifest.json").write_text(json.dumps(dict.fromkeys(config["packages"], "1.2.3")))
+    for path in config["packages"]:
+        (repository / path / "CHANGELOG.md").write_text("# Changelog\n\n## 1.2.3\n\nInitial.\n")
+    with (repository / "pyproject.toml").open("a") as file:
+        file.write(
+            "\n[tool.repo-tools.conventional-commits]\n"
+            'shared-scopes = ["ci", "docs", "repo-tools"]\n'
+        )
+    return repository
+
+
 REPOSITORY = "owner/project"
 
 

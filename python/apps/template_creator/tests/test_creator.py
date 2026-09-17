@@ -260,7 +260,7 @@ def test_licenses(recipe: dict[str, Any], snapshot: Snapshot, choice: str) -> No
     files = render(snapshot, config)
     assert files["LICENSE"].decode() == text
     for path, content in files.items():
-        if path.endswith("pyproject.toml"):
+        if path.endswith("pyproject.toml") and path != "pyproject.toml":
             metadata = tomllib.loads(content.decode())["project"]
             assert metadata["license-files"] == ["LICENSE"]
             assert metadata["authors"] == [recipe["author"]]
@@ -269,10 +269,11 @@ def test_licenses(recipe: dict[str, Any], snapshot: Snapshot, choice: str) -> No
 def test_render_consistency(config: Config, snapshot: Snapshot) -> None:
     files = render(snapshot, config)
     assert files["uv.lock"] == snapshot.files["uv.lock"]
-    assert files["version.txt"] == b"0.2.0\n"
-    assert b"0.2.0" in files["CMakeLists.txt"]
+    assert "version.txt" not in files
+    assert files["native/packages/core/version.txt"] == b"0.2.0\n"
+    assert b"VERSION 0.2.0" not in files["CMakeLists.txt"]
     assert "python/packages/core/src/acme_lab_core/__init__.py" in files
-    assert "cmake/AcmeLabConfig.cmake.in" in files
+    assert "cmake/ComponentConfig.cmake.in" in files
     assert "native/packages/core/include/acme_lab/core.h" in files
     assert b"acme-lab-package-a-cli" in files["python/apps/package_a_cli/pyproject.toml"]
     assert b"@acme/native" in files[".github/CODEOWNERS"]

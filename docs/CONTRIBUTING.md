@@ -78,8 +78,24 @@ checking the live title. Ordinary PR events also validate fork PRs using their a
 
 The subject format is `type(scope)!: description`; scope and `!` are optional. Allowed types are
 `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and `test`.
-Types and scopes are lowercase. Scopes start with a letter or digit and can contain letters,
-digits, `.`, `_`, `/`, and `-`. Descriptions must be nonempty with no surrounding whitespace or
+Scopes, when supplied, must match a component ID or a shared scope. Component scopes come from
+Release Please's configuration; shared scopes are declared once in
+`[tool.repo-tools.conventional-commits].shared-scopes` in the root `pyproject.toml`.
+Use `uv run repo-tools list-scopes` to see the current names and component paths. For example,
+`fix(python-core): handle empty input` and `chore(deps): update tools` are valid. Omit a scope for
+changes spanning several components; scopes describe a commit and do not determine release ownership.
+
+After `uv sync --locked --all-packages`, use `uv run cz commit` for guided authoring, or
+`uv run cz commit --dry-run` to preview without creating a commit. The repository's Commitizen
+adapter shares the hook/CI policy and prompts for type, optional scope, description, body,
+breaking-change explanation, and footers. Ordinary `git commit` remains supported. Release Please
+owns version bumps and changelogs; do not use Commitizen's bump or changelog commands.
+
+Commit ranges use the scope policy recorded at each commit. A component removal or rename can
+use a scope from its parent; historical commits before this policy remain valid under their old
+syntax policy. New PR titles and commit-message hooks use the checkout's current scope list.
+
+Descriptions must be nonempty with no surrounding whitespace or
 control characters. This is the repository's subset of [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
 implemented in `tools/repo_tools/src/repo_tools/conventional_commits.py`. See [CI event behavior](testing.md#pr-and-post-merge-responsibilities)
 for checked commit ranges, and [releases](releases.md#conventional-commits) for version effects.

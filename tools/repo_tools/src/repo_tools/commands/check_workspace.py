@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+from repo_tools.components import configured_components, legacy_config
+from repo_tools.conventional_commits import scope_policy
 from repo_tools.python_smoke_checks import SMOKE_CHECKS
 from repo_tools.repository_metadata import (
     discover_members,
@@ -23,14 +25,14 @@ def workspace_errors(root: Path) -> list[str]:
     config = read_project(root / "pyproject.toml")
     members, errors = discover_members(root, config)
     names = [member.name for member in members]
-    root_name = normalized_name(config["project"]["name"])
-    all_names = [root_name, *names]
+    root_name = normalized_name(config["project"]["name"]) if "project" in config else None
+    all_names = ([root_name] if root_name else []) + names
     namespaces = [namespace for member in members for namespace in sorted(member.namespaces)]
     errors.extend(registration_errors("workspace distribution names", all_names, all_names))
     errors.extend(registration_errors("workspace import namespaces", namespaces, namespaces))
 
     expected_projects = {
-        Path("pyproject.toml"): root_name,
+        **({Path("pyproject.toml"): root_name} if root_name else {}),
         **{member.path / "pyproject.toml": member.name for member in members},
     }
     smoke_names = [normalized_name(name) for name in SMOKE_CHECKS]
@@ -64,6 +66,22 @@ def workspace_errors(root: Path) -> list[str]:
 
     try:
         release = json.loads((root / RELEASE_CONFIG).read_text(encoding="utf-8"))
+        if not legacy_config(release):
+            components = configured_components(release)
+            scope_policy(root)
+            errors.extend(
+                registration_errors(
+                    "Python release ownership",
+                    (p.as_posix() for p in expected_projects),
+                    (
+                        file
+                        for c in components
+                        for file in c.files
+                        if file.endswith("pyproject.toml")
+                    ),
+                )
+            )
+            return errors
         extra_files = release["packages"]["."]["extra-files"]
         # Other entries, including the native CMake version, retain their own checks.
         entries = [

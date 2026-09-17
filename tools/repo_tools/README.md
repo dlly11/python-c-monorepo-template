@@ -1,8 +1,9 @@
 # Private repository tooling
 
 This standard `src`-layout package contains the repository's maintenance commands and their tests.
-It has no runtime dependencies. It is an editable development dependency, not a released workspace
-component; its private version is independent of the product version.
+Its maintenance commands have no runtime dependencies. The optional `commit` extra installs
+Commitizen and the repository authoring adapter. It is an editable development dependency, not a released workspace
+component; its private version is independent of product versions.
 
 From the repository root:
 
@@ -65,7 +66,7 @@ Relative file arguments are relative to the working directory, regardless of the
 4. Add focused behavior tests under `tests`, using direct imports, explicit arguments, temporary
    roots, and the shared isolated `git` fixture. Test CLI behavior through `repo_tools.cli.main`;
    keep parsing separate from helper tests. The normal repository pytest run discovers these tests.
-5. Keep package imports standard-library-only so the source launcher, help, and metadata checks
+5. Keep command imports standard-library-only so the source launcher, help, and metadata checks
    work before dependencies are installed. Commands that require development tools must check
    prerequisites before changing outputs; follow the shared environment preflight when importing
    checkout packages.
@@ -85,3 +86,15 @@ schema-2 validation. Both use read-only GitHub access; see the testing guide for
 
 See the [workstation guide](../../docs/workstation.md), [testing guide](../../docs/testing.md), and
 [release guide](../../docs/releases.md) for workflows.
+
+## Commit authoring and release ownership
+
+`list-scopes` reads component IDs from Release Please and shared scopes from the root pyproject.
+`commitizen_adapter` is loaded only by Commitizen; importing maintenance commands never requires
+that extra. The root dev group installs it for `uv run cz commit`. See the
+[contribution guide](../../docs/CONTRIBUTING.md#commit-messages-and-pull-requests).
+
+`components` is the shared release metadata model used by checks, the transactional component
+setter, the exact-release classifier, and artifact planning. `release-assets plan` validates Release
+Please outputs; its `python` and `native` operations build immutable tag commits and **upload**
+artifacts using GitHub CLI. These are workflow operations, not read-only diagnostics.

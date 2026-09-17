@@ -40,11 +40,11 @@ repos:
         always_run: true
 
       - id: version-consistency
-        name: repository version consistency
+        name: component version consistency
         entry: uv run repo-tools check-versions
         language: system
         pass_filenames: false
-        files: ^(version\.txt|uv\.lock|CMakeLists\.txt|pyproject\.toml|python/.*/pyproject\.toml)$
+        files: ^(version\.txt|native/.*/version\.txt|uv\.lock|CMakeLists\.txt|pyproject\.toml|python/.*/pyproject\.toml|tools/release-please/.*\.json)$
 
       - id: ty
         name: ty (Python workspace members and private tooling)

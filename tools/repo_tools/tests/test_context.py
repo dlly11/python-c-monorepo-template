@@ -12,8 +12,9 @@ import pytest
 
 from repo_tools import cli, github_checks
 from repo_tools.commands import check_commits, check_coverage, set_version
+from repo_tools.components import component_errors
 from repo_tools.context import resolve_root
-from repo_tools.repository_metadata import python_projects, version_errors
+from repo_tools.repository_metadata import python_projects
 
 LAUNCHER = Path(__file__).resolve().parents[1] / "run.py"
 
@@ -111,7 +112,9 @@ def test_absolute_workspace_globs_have_configuration_diagnostics(
     assert "Traceback" not in error
 
 
-@pytest.mark.parametrize("command", [["set-version", "2.0.0"], ["check-coverage"], ["build-docs"]])
+@pytest.mark.parametrize(
+    "command", [["set-version", "template", "2.0.0"], ["check-coverage"], ["build-docs"]]
+)
 def test_invalid_explicit_root_fails_before_effects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: list[str]
 ) -> None:
@@ -177,8 +180,9 @@ def test_selected_checkout_supplies_policy(repository: Path) -> None:
 
 
 def test_product_version_update_excludes_private_tooling(
-    repository: Path, monkeypatch: pytest.MonkeyPatch
+    independent_repository: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    repository = independent_repository
     private = repository / "tools/repo_tools/pyproject.toml"
     private.parent.mkdir(parents=True)
     contents = '[project]\nname = "monorepo-repo-tools"\nversion = "0.1.0"\n'
@@ -188,11 +192,11 @@ def test_product_version_update_excludes_private_tooling(
         file.write('[[package]]\nname = "monorepo-repo-tools"\nversion = "0.1.0"\n')
 
     def refresh(*args: object, **kwargs: object) -> None:
-        lock.write_text(lock.read_text().replace('"1.2.3"', '"2.0.0"'), encoding="utf-8")
+        lock.write_text(lock.read_text().replace('"1.2.3"', '"2.0.0"', 1), encoding="utf-8")
 
     monkeypatch.setattr(subprocess, "run", refresh)
-    set_version.update_version(repository, "2.0.0")
+    set_version.update_version(repository, "2.0.0", "template")
     assert private.read_text() == contents
     assert 'version = "0.1.0"' in lock.read_text()
     assert private.relative_to(repository) not in python_projects(repository)
-    assert version_errors(repository, "2.0.0") == []
+    assert component_errors(repository) == []

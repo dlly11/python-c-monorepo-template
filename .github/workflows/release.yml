@@ -39,6 +39,10 @@ jobs:
       pull-requests: write
     outputs:
       ready: ${{ steps.readiness.outputs.ready }}
+      tooling-sha: ${{ steps.assets.outputs.tooling-sha }}
+      releases: ${{ steps.assets.outputs.releases }}
+      python: ${{ steps.assets.outputs.python }}
+      native: ${{ steps.assets.outputs.native }}
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
     steps:
@@ -85,29 +89,55 @@ jobs:
           manifest-file: tools/release-please/manifest.json
           skip-github-pull-request: true
 
+      - name: Plan component assets
+        if: steps.readiness.outputs.ready == 'true'
+        id: assets
+        env:
+          RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+        run: python tools/repo_tools/run.py release-assets plan
+
+      # BEGIN TEMPLATE CREATOR ONLY
+      - name: Keep the template release as the main download
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          GH_TOKEN: *release-token
+        run: |
+          # Component releases must not replace the creator's stable download landing page.
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' > /tmp/release-tags.txt
+          python - <<'PYCODE'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          tags = Path('/tmp/release-tags.txt').read_text().splitlines()
+          tag = next(tag for tag in tags if re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag))
+          subprocess.run(['gh', 'release', 'edit', tag, '--latest'], check=True)
+          PYCODE
+      # END TEMPLATE CREATOR ONLY
+
       - name: Summarize release creation
         if: always()
         continue-on-error: true
         env:
           STAGE_STATUS: ${{ job.status }}
-          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASES: ${{ steps.assets.outputs.releases }}
         run: |
           python - <<'PY'
           import os
+          import json
           from html import escape
           from pathlib import Path
           from urllib.parse import quote
 
           repository = os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY']
           lines = ['## Release creation', '', 'Outcome: ' + escape(os.environ['STAGE_STATUS']), '']
-          tag = os.environ.get('RELEASE_TAG', '')
-          if os.environ.get('RELEASE_CREATED') == 'true' and tag:
+          releases = json.loads(os.environ.get('RELEASES') or '[]')
+          for release in releases:
+              tag = release['tag']
               url = repository + '/releases/tag/' + quote(tag, safe='')
-              lines += [f'Release: <a href="{escape(url, quote=True)}">{escape(tag)}</a>.',
-                        '', 'Asset uploads run separately; creation does not confirm their completion.']
-          else:
-              lines += ['No new release was reported by this job.']
+              lines += [f'- <a href="{escape(url, quote=True)}">{escape(tag)}</a>']
+          lines += ['', 'Asset uploads run separately; creation does not confirm their completion.'
+                    if releases else 'No new release was reported by this job.']
           guide = repository + '/blob/main/docs/releases.md#release-recovery'
           lines += ['', f'<a href="{escape(guide, quote=True)}">Choose the recovery procedure</a>.']
           with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as stream:
@@ -279,41 +309,31 @@ jobs:
 
   python-assets:
     name: Publish Python assets
-    if: needs.release-please.outputs.release-created == 'true'
+    if: needs.release-please.outputs.python == 'true'
     needs: release-please
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ needs.release-please.outputs.tooling-sha }}
+          fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag-name }}
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-      - name: Verify the release version
-        env:
-          RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
-        run: python tools/repo_tools/run.py check-versions --tag "${RELEASE_TAG}"
-      - name: Build every Python distribution
-        run: uv build --all-packages --out-dir dist
-      - name: Smoke-test the release wheels
-        run: python tools/repo_tools/run.py check-python-install --dist dist
-      - name: Attach Python distributions to the GitHub release
+      - name: Build, check, and upload released Python distributions
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
-        run: gh release upload "${RELEASE_TAG}" dist/* --clobber
+          RELEASES: ${{ needs.release-please.outputs.releases }}
+        run: python tools/repo_tools/run.py release-assets python
 
   native-assets:
     name: Publish native asset (${{ matrix.os }})
-    if: needs.release-please.outputs.release-created == 'true'
+    if: needs.release-please.outputs.native == 'true'
     needs: release-please
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: write
     strategy:
@@ -321,46 +341,23 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
-          - os: ubuntu-latest
-            cc: gcc
-            cxx: g++
-          - os: macos-latest
-            cc: clang
-            cxx: clang++
-          - os: windows-latest
-            cc: gcc
-            cxx: g++
+          - {os: ubuntu-latest, cc: gcc, cxx: g++}
+          - {os: macos-latest, cc: clang, cxx: clang++}
+          - {os: windows-latest, cc: gcc, cxx: g++}
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
-      RELEASE_TAG: ${{ needs.release-please.outputs.tag-name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ needs.release-please.outputs.tooling-sha }}
+          fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag-name }}
-      - name: Verify the release version
-        run: python tools/repo_tools/run.py check-versions --tag "${RELEASE_TAG}"
-      - name: Build and install the native components
-        run: |
-          cmake --preset release
-          cmake --build --preset release
-          cmake --install build/release --prefix stage
-          python tools/repo_tools/run.py check-native-install stage
-          cmake -S native/tests/install_consumer -B build/release-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release -DMONOREPO_INSTALL_PREFIX="${{ github.workspace }}/stage"
-          cmake --build build/release-consumer
-          ctest --test-dir build/release-consumer --output-on-failure
-          cmake -E make_directory dist
-      - name: Create the native archive
+      - name: Build, check, and upload released native components
         env:
-          ARCHIVE: ${{ github.event.repository.name }}-${{ needs.release-please.outputs.tag-name }}-${{ runner.os }}-${{ runner.arch }}.zip
-        run: cmake -E tar cf "../dist/${ARCHIVE}" --format=zip .
-        working-directory: stage
-      - name: Attach the native archive to the GitHub release
-        env:
-          ARCHIVE: ${{ github.event.repository.name }}-${{ needs.release-please.outputs.tag-name }}-${{ runner.os }}-${{ runner.arch }}.zip
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${RELEASE_TAG}" "dist/${ARCHIVE}" --clobber
+          RELEASES: ${{ needs.release-please.outputs.releases }}
+        run: python tools/repo_tools/run.py release-assets native
 
   # BEGIN TEMPLATE CREATOR ONLY
   creator-assets:

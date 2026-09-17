@@ -24,6 +24,8 @@ COMMANDS = (
     "check-versions",
     "check-workspace",
     "doctor",
+    "list-scopes",
+    "release-assets",
     "set-version",
 )
 

@@ -71,7 +71,7 @@ def summary(config: Config) -> str:
             f"Repository: {config.repository_url}",
             f"Documentation: {data['github']['docs_url']}",
             f"Python: {config.distribution_prefix}-core / {config.prefix}_core",
-            f"C/CMake: {config.prefix}::core / {config.cmake_package}",
+            f"C/CMake: {config.prefix}::core / {config.cmake_package}Core",
             f"Executable: {config.distribution_prefix}-package-a-cli",
             f"Author: {data['author']['name']} <{data['author']['email']}>",
             f"Security contact: {data['security']['contact']}",
@@ -121,7 +121,7 @@ def section(number: int, data: dict[str, Any]) -> None:
             "slug": slug,
             "description": description,
             "prefix": prefix,
-            "version": ask("Initial version", old.get("version", "0.1.0")),
+            "version": ask("Initial component version", old.get("version", "0.1.0")),
         }
         if "github" in data:
             github = data["github"]

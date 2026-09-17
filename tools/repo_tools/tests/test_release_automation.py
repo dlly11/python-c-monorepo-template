@@ -58,7 +58,7 @@ def release_pr(monkeypatch: pytest.MonkeyPatch, managed_branch: str) -> dict[str
     pr = {
         "state": "open",
         "draft": False,
-        "title": "chore(main): release 2.0.0",
+        "title": "chore: release main",
         "base": {"ref": "main", "repo": {"full_name": "owner/project"}},
         "head": {
             "ref": managed_branch,
