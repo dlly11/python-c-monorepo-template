@@ -7,7 +7,7 @@ This directory contains the private maintenance package and shared tool configur
   workflow passes both paths explicitly.
 - `sphinx/` configures the repository-wide MyST, Mermaid, autodoc, and Breathe documentation site.
 - `doxygen/` configures XML generation for the public native C headers consumed by Breathe.
-- `github/repository-policy.json` defines the managed repository settings and required check names.
+- `github/repository-policy.json` defines managed repository settings, required check names, and validation profiles.
   The read-only audit and CI evidence checks share this policy.
 - `coverage/` defines gcovr source filtering and the native line and branch thresholds.
 

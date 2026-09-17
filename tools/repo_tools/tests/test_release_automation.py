@@ -54,7 +54,7 @@ def release_pr(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         "title": "chore(main): release 2.0.0",
         "base": {"ref": "main", "repo": {"full_name": "owner/project"}},
         "head": {
-            "ref": "release-please--branches--main",
+            "ref": "release-please--branches--main--components--python-c-monorepo-template",
             "sha": "a" * 40,
             "repo": {"full_name": "owner/project"},
         },
@@ -66,7 +66,13 @@ def release_pr(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 def test_major_release_is_eligible(release_pr: dict[str, Any]) -> None:
     assert (
-        automation.eligible_pr("owner/project", 1, "release-please--branches--main", "a" * 40)
+        automation.eligible_pr(
+            "owner/project",
+            1,
+            "release-please--branches--main--components--python-c-monorepo-template",
+            "a" * 40,
+            root=Path.cwd(),
+        )
         == release_pr["title"]
     )
 
@@ -94,7 +100,13 @@ def test_ineligible_pr(release_pr: dict[str, Any], change: str) -> None:
     else:
         release_pr["base"]["repo"] = None
     with pytest.raises(ValueError):
-        automation.eligible_pr("owner/project", 1, "release-please--branches--main", "a" * 40)
+        automation.eligible_pr(
+            "owner/project",
+            1,
+            "release-please--branches--main--components--python-c-monorepo-template",
+            "a" * 40,
+            root=Path.cwd(),
+        )
 
 
 def test_configuration_cli_checks_repository_and_writes_no_secrets(
@@ -127,7 +139,7 @@ def test_pr_cli_publishes_validated_title(
                 "--pr",
                 "1",
                 "--branch",
-                "release-please--branches--main",
+                "release-please--branches--main--components--python-c-monorepo-template",
                 "--expected-head",
                 "a" * 40,
             ]

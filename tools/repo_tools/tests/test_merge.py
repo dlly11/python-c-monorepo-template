@@ -88,7 +88,7 @@ def test_preserved_commit_subjects_are_checked(
     state["pr"].update(merge_commit_sha=commit)
     state["pr"]["head"]["sha"] = head
     with pytest.raises(ValueError, match="merged PR commit subject"):
-        module.verify_commit(REPOSITORY, commit, state["required"], 42)
+        module.verify_commit(REPOSITORY, commit, 42)
 
 
 def test_manual_release_branch_ci_and_fork_pr_ci(
@@ -199,12 +199,12 @@ def test_nonconventional_subject_and_unsupported_parent_counts_are_rejected(
     git = state["git"]
     invalid = git("commit-tree", state["tree"], "-p", state["base"], "-m", "Update things")
     with pytest.raises(ValueError, match="subject"):
-        module.verify_commit(REPOSITORY, invalid, state["required"], 42)
+        module.verify_commit(REPOSITORY, invalid, 42)
     for parents in [[], [state["base"], state["head"], invalid]]:
         args = [arg for parent in parents for arg in ("-p", parent)]
         commit = git("commit-tree", state["tree"], *args, "-m", "fix: merge")
         with pytest.raises(ValueError, match="two-parent merge commit"):
-            module.verify_commit(REPOSITORY, commit, state["required"], 42)
+            module.verify_commit(REPOSITORY, commit, 42)
 
 
 def test_merge_must_preserve_the_original_pr_head(
@@ -216,7 +216,7 @@ def test_merge_must_preserve_the_original_pr_head(
     commit = git("commit-tree", state["tree"], "-p", state["base"], "-p", other, "-m", "fix: merge")
     state["pr"]["merge_commit_sha"] = commit
     with pytest.raises(ValueError, match="second parent"):
-        module.verify_commit(REPOSITORY, commit, state["required"], 42)
+        module.verify_commit(REPOSITORY, commit, 42)
 
 
 def test_default_github_merge_subject_is_rejected(
@@ -235,7 +235,7 @@ def test_default_github_merge_subject_is_rejected(
     )
     state["pr"]["merge_commit_sha"] = commit
     with pytest.raises(ValueError, match="subject"):
-        module.verify_commit(REPOSITORY, commit, state["required"], 42)
+        module.verify_commit(REPOSITORY, commit, 42)
 
 
 def test_record_uses_actual_synthetic_merge_tree(
@@ -329,4 +329,4 @@ def test_new_run_during_download_invalidates_selected_evidence(
 
     monkeypatch.setattr(module, "validation_record", download)
     with pytest.raises(ValueError, match="newer PR CI run"):
-        module.verify_commit(REPOSITORY, state["merge"], state["required"], 42)
+        module.verify_commit(REPOSITORY, state["merge"], 42)

@@ -78,5 +78,10 @@ user-facing operation; CLI help remains the reference for command options.
 and the managed PR/head eligible for auto-merge. It never merges a PR or changes GitHub settings;
 the release workflow owns those writes. See the release guide for configuration and activation.
 
+`check-ci-context` selects the workflow role and validation profile. Its local `--classify --base
+SHA --head SHA` mode explains whether a committed change is metadata-only, without GitHub access.
+`check-ci-result` requires successful jobs or matching authoritative dispatch evidence and records
+schema-2 validation. Both use read-only GitHub access; see the testing guide for the trust rules.
+
 See the [workstation guide](../../docs/workstation.md), [testing guide](../../docs/testing.md), and
 [release guide](../../docs/releases.md) for workflows.

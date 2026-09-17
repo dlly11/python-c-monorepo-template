@@ -36,8 +36,10 @@ documentation with `uv run --group docs repo-tools build-docs` and open
 
 | Event | Quality work | Commit subjects | Release eligibility |
 | --- | --- | --- | --- |
-| Pull request | Full suite and separate title check | PR head commits outside the event's base SHA | Tested evidence for the later merge |
-| Manual CI | Full suite on selected branch | Commits outside `origin/main` (none on main) | Explicit recovery only on current main |
+| Ordinary pull request | Full suite, CI result, and separate title check | PR head commits outside the event's base SHA | Tested evidence for the later merge |
+| Manual CI (ordinary branch or main) | Full suite and CI result | Commits outside `origin/main` (none on main) | Explicit recovery only on current main |
+| Managed release PR dispatch | Release validation when eligible; otherwise full suite | Commits outside the live base SHA | Authoritative evidence for the exact synchronized head |
+| Managed release PR event | CI result verifies the authoritative dispatch; separate title check | Validated by the dispatch | No duplicate quality suite |
 | Ordinary main push | Merged PR verification and version check | New squash/merge subjects and preserved or rebased PR commits | Latest successful verified push on current main |
 | Initial branch creation (zero previous SHA) | Full suite; no validation record | Inherited history is the baseline and is skipped | Never |
 
@@ -49,7 +51,7 @@ builds and smoke-tests tagged artifacts without repeating the PR test and analys
 Push CI on `main` runs only `Merged PR verification`. It walks the new first-parent history backward
 from the push head, accepting squash commits, two-parent merge commits, and rebased PR sequences.
 For each integration it checks the subjects, finds its merged GitHub PR, verifies that the original head
-has a successful CI run with every required CI job completed successfully, and compares the merged
+has a successful CI run with every job in the recorded profile completed successfully, and compares the merged
 Git tree with the recorded tested tree. A merge commit must have the PR head as its second parent;
 the verifier also checks subjects of the preserved PR commits newly introduced to main. Intermediate
 PR commits do not need their own validation records: CI certifies the final integrated contents.
@@ -65,11 +67,48 @@ Skipped checks are not accepted as passing. Version metadata is checked without 
 or rebuilding packages. The other CI jobs appear skipped on push runs because they already ran
 on the PR.
 
-The Python quality job uploads a small `pr-validation` JSON record of the actual checkout and
-tree, tied to its repository, run ID, and original head SHA. This distinguishes the PR's synthetic
-merge commit from the final integrated commit while verifying identical tracked contents. Normal
-PR runs and full manually dispatched release-branch runs both produce this record. It is validation
-metadata, not a distributable build artifact. Release distributions are built from their tag.
+The **CI result** job uploads a small `pr-validation` JSON record only after its selected suite
+passes. Schema 2 binds the repository, run ID and attempt, original head, actual checkout and Git
+tree, profile, and base SHA. Reduced validation also records the successful main verification run
+and attempt. The record certifies tracked contents; release distributions are built from their tag.
+Automatic release-PR runs consume the dispatch's record and do not upload a second one.
+
+Post-merge verification independently checks the profile and its jobs. Release-only evidence must
+match the actual integration predecessor, an unchanged verified base run, and a fresh semantic
+classification of the integrated changes. Legacy schema-1 records are accepted only for historical
+full-suite commits, using the policy committed in that tested tree. New workflows require schema 2.
+
+### Release-only validation
+
+The reduced profile requires an open, same-repository Release Please PR targeting main, the
+configured managed branch, a pending-release label, a conventional release title, and an unchanged
+base with successful **Merged PR verification**. Its committed changes must be exactly:
+
+- One increasing version, synchronized across `version.txt`, root/product `project.version`,
+  the literal CMake project version, and the single-root release manifest.
+- Only workspace version updates in `uv.lock`; dependencies, sources, hashes, and other fields
+  must remain identical.
+- A new changelog entry prepended without changing existing history.
+
+The classifier reads the base revision's workspace metadata and runs the base revision's classifier
+code. Changes to code, workflows, dependencies, configuration, file paths/modes, or unrelated
+metadata fall back to full CI. An unsupported release layout or unavailable successful base
+verification also uses full CI. API failures and stale PR identities fail rather than silently pass.
+The PR introducing this mechanism uses full CI because its base does not yet support it.
+
+**Release validation** runs on Linux/Python 3.12: commit subjects, locked workspace sync, workspace
+and version checks, wheel/source builds and installed-wheel smoke checks, plus a native Release
+build/install and downstream CMake consumer. The upstream template also checks its inventory and
+runs a source-based creator generation smoke test. It omits compatibility/platform matrices,
+coverage, docs, analysis, sanitizers, and frozen creator builds; those inputs are unchanged from the
+verified base. Tagged release jobs still build and smoke-test the actual published artifacts.
+
+In every credential mode, Release dispatches CI after lockfile synchronization with the PR number
+and exact expected head. Automatic PR runs delegate to the newest matching dispatch and wait up to
+35 minutes. A missing dispatch times out; a failed/cancelled run, changed head/base, or newer attempt
+fails the gate. Retry release preparation to dispatch a fresh synchronized run. Event-specific
+concurrency prevents a delegate from cancelling the dispatch. The cheap live title check remains
+independent, including title edits.
 
 The verifier reads records from the selected CI run only, fails on missing or expired evidence,
 and never executes downloaded content. GitHub's repository artifact retention applies. See
@@ -119,7 +158,7 @@ a platform suffix, arguments, and expected exit status/output. Keep CLI expectat
 or adding an application; the installer runs those cases from the isolated environment rather
 than matching product names. These checks cover the exercised install/API paths; ordinary
 component tests remain responsible for deeper behavior.
-CI runs the wheel checks once in the existing Python quality job, alongside the separate Python
+CI runs the wheel checks once in Python quality or Release validation, alongside the separate Python
 version test matrix. The release workflow continues to build the same distribution formats.
 
 To smoke-test already-built release wheels without rebuilding them, run
@@ -254,7 +293,7 @@ change the result. No separate workflow-lint job is required.
 Creator tests run in the existing Python suite. Six **Repository creator (PLATFORM-ARCH)** jobs
 build and smoke-test executables with only uv on PATH. The Linux x64 job additionally validates
 a generated project, including Python quality/tests/wheels, native tests/install/consumer, and docs.
-All six jobs are required upstream; generated repositories omit those jobs and policy entries.
+The full profile requires all six jobs through CI result; generated repositories omit them.
 The existing `check-python` command also type-checks the build helpers in `tools/creator`.
 The default lint dependencies include setuptools so the creator's custom build backend can
 be type-checked without installing the optional executable-build dependencies.

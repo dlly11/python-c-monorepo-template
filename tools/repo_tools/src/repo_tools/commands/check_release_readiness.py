@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
+from repo_tools.ci_validation import policy_at, profile_jobs, verify_profile
 from repo_tools.github_api import api, items, repository_name
-from repo_tools.github_checks import check_evidence, check_jobs, merged_pr, required_ci_jobs
+from repo_tools.github_checks import check_evidence, check_jobs, merged_pr
 
 
 def check_run(
@@ -93,8 +94,18 @@ def ready(
     check_run(latest, repository, sha, workflow_id, event=ci_event)
     if recovery:
         merged_pr(repository, sha, root=root)
-        check_jobs(repository, latest["id"], required_ci_jobs(root=root))
-        check_evidence(repository, latest["id"], sha, sha, exact_checkout=True, root=root)
+        evidence = check_evidence(
+            repository, latest["id"], sha, sha, exact_checkout=True, root=root
+        )
+        if evidence["schema"] == 2:
+            if evidence["profile"] != "full":
+                raise ValueError("recovery requires full CI")
+            verify_profile(repository, latest, evidence, sha, root)
+        else:
+            policy = policy_at(root, sha)
+            if "validation" in policy:
+                raise ValueError("profile-based recovery requires schema-2 evidence")
+            check_jobs(repository, latest["id"], profile_jobs(policy, "full"))
     else:
         jobs = items(
             f"repos/{repository}/actions/runs/{latest['id']}/jobs?filter=latest&per_page=100",
@@ -116,8 +127,11 @@ def ready(
         ):
             raise ValueError("push CI must contain successful Merged PR verification")
     # Recheck after downloading evidence so an in-place rerun cannot authorize release.
+    current_run = api(f"repos/{repository}/actions/runs/{latest['id']}")
+    if current_run.get("run_attempt") != latest.get("run_attempt"):
+        raise ValueError("a newer CI run attempt started during readiness validation")
     check_run(
-        api(f"repos/{repository}/actions/runs/{latest['id']}"),
+        current_run,
         repository,
         sha,
         workflow_id,

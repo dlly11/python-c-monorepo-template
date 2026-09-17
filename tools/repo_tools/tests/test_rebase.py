@@ -26,7 +26,7 @@ def test_rewritten_shas_and_different_intermediate_tree_reuse_one_pr_run(
         "show", "-s", "--format=%B", state["head"]
     )
     assert git("rev-parse", f"{first}^{{tree}}") != state["tree"]
-    assert module.verify_commit(REPOSITORY, final, state["required"], 42) == [first, final]
+    assert module.verify_commit(REPOSITORY, final, 42) == [first, final]
     capsys.readouterr()
     assert cli.main(state["arguments"]) == 0
     assert capsys.readouterr().out.count("tested tree") == 1
