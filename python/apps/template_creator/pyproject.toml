@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "monorepo-template-creator"
-version = "2.0.0"
+version = "2.0.1"
 description = "Guided creation of configured Python and C monorepositories."
 readme = "README.md"
 requires-python = ">=3.12"
