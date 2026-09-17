@@ -7,7 +7,7 @@
 | `version.txt` and component metadata | The shared release number of this repository's deliverables |
 | A member's `[project].dependencies` | Compatible runtime dependency ranges advertised to consumers |
 | Root dependency groups and `uv.lock` | Requested development tools and their resolved Python dependency versions |
-| System tool installation | CMake, compilers, native analysis tools, Doxygen, and uv itself |
+| System tool installation | CMake, compilers, clang-tidy, cppcheck, Doxygen, and uv itself |
 
 Changing a tool does not require setting its version to the repository release number. A requirement
 such as `example-core>=0.1.0` describes the oldest compatible API, not the current release.
@@ -137,7 +137,7 @@ mention the reason for the upgrade in the PR.
 | Compiler, CMake, Ninja, or native analysis tool | Doctor, a fresh native build, CTest, install-consumer checks, and affected analysis/sanitizer/coverage workflows |
 
 Keep isolated pre-commit hook revisions aligned when upgrading their corresponding workspace tools
-(especially Ruff). The uv executable, hook revisions, GitHub Actions versions, and native tools are
+(especially Ruff). The uv executable, hook revisions, GitHub Actions versions, and system tools are
 not pinned by `uv.lock`; review their own configuration or installation source separately.
 Use the existing [contribution commands](CONTRIBUTING.md) and [testing guide](testing.md).
 
@@ -153,3 +153,8 @@ After upgrading, run `uv run pre-commit run actionlint --all-files` and review a
 GitHub Actions are pinned to full upstream commit SHAs with version comments. Dependabot's existing
 GitHub Actions group proposes updates. Review both the commit and its upstream release when
 updating a pin; keep the comment aligned. No extra CI job is needed for this policy.
+
+clang-format has one exact pin in the root lint dependency group. Its resolved version in
+`uv.lock` is used by the creator, and hooks/CMake formatting targets run it through uv.
+Upgrade the declaration and lockfile together, run native formatting and analysis, and review
+any resulting source changes. System clang-tidy, cppcheck, and compiler versions remain separate.

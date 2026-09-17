@@ -85,6 +85,35 @@ jobs:
           manifest-file: tools/release-please/manifest.json
           skip-github-pull-request: true
 
+      - name: Summarize release creation
+        if: always()
+        continue-on-error: true
+        env:
+          STAGE_STATUS: ${{ job.status }}
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          from html import escape
+          from pathlib import Path
+          from urllib.parse import quote
+
+          repository = os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY']
+          lines = ['## Release creation', '', 'Outcome: ' + escape(os.environ['STAGE_STATUS']), '']
+          tag = os.environ.get('RELEASE_TAG', '')
+          if os.environ.get('RELEASE_CREATED') == 'true' and tag:
+              url = repository + '/releases/tag/' + quote(tag, safe='')
+              lines += [f'Release: <a href="{escape(url, quote=True)}">{escape(tag)}</a>.',
+                        '', 'Asset uploads run separately; creation does not confirm their completion.']
+          else:
+              lines += ['No new release was reported by this job.']
+          guide = repository + '/blob/main/docs/releases.md#release-recovery'
+          lines += ['', f'<a href="{escape(guide, quote=True)}">Choose the recovery procedure</a>.']
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as stream:
+              stream.write('\n'.join(lines) + '\n')
+          PY
+
   prepare-release-pr:
     name: Prepare release PR
     needs: release-please
@@ -220,6 +249,33 @@ jobs:
         run: >-
           gh pr merge "${RELEASE_PR_NUMBER}" --repo "${GITHUB_REPOSITORY}"
           --auto --squash --match-head-commit "${RELEASE_HEAD}" --subject "${RELEASE_TITLE}"
+
+      - name: Summarize release PR preparation
+        if: always()
+        continue-on-error: true
+        env:
+          STAGE_STATUS: ${{ job.status }}
+          RELEASE_PR_NUMBER: ${{ steps.release-pr.outputs.number }}
+        run: |
+          python - <<'PY'
+          import os
+          from html import escape
+          from pathlib import Path
+
+          repository = os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY']
+          lines = ['## Release PR preparation', '', 'Outcome: ' + escape(os.environ['STAGE_STATUS']), '']
+          number = os.environ.get('RELEASE_PR_NUMBER', '')
+          if number.isascii() and number.isdigit():
+              url = repository + '/pull/' + number
+              lines += [f'Release PR: <a href="{escape(url, quote=True)}">#{number}</a>.']
+          else:
+              lines += ['No release PR number was reported by this job.']
+          lines += ['', 'A preparation failure does not block assets for an already-created release.']
+          guide = repository + '/blob/main/docs/releases.md#release-recovery'
+          lines += ['', f'<a href="{escape(guide, quote=True)}">Choose the recovery procedure</a>.']
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as stream:
+              stream.write('\n'.join(lines) + '\n')
+          PY
 
   python-assets:
     name: Publish Python assets

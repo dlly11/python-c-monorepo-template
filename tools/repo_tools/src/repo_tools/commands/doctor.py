@@ -45,7 +45,7 @@ def compiler_command(variable: str, default: str) -> tuple[str, ...]:
 def profile_tools(profile: str) -> list[Tool]:
     """Select system tools; Python dependency groups are installed by uv sync."""
     tools: list[Tool] = []
-    if profile in ("python", "docs", "coverage", "all"):
+    if profile in ("python", "analysis", "docs", "coverage", "all"):
         tools.append(Tool("uv", ("uv",), (0, 10, 9)))
     if profile != "python":
         tools.extend([Tool("CMake", ("cmake",), (3, 25)), Tool("Ninja", ("ninja",))])
@@ -60,7 +60,7 @@ def profile_tools(profile: str) -> list[Tool]:
                 )
             )
     if profile in ("analysis", "all"):
-        tools.extend(Tool(name, (name,)) for name in ("clang-format", "clang-tidy", "cppcheck"))
+        tools.extend(Tool(name, (name,)) for name in ("clang-tidy", "cppcheck"))
     if profile in ("docs", "all"):
         tools.append(Tool("Doxygen", ("doxygen",), (1, 9, 2)))
     if profile in ("coverage", "all") and platform.system() == "Linux":

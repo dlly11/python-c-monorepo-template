@@ -5,12 +5,21 @@
 `.clang-format` is the single source of formatting policy for production C, public headers, and
 CppUTest C++ sources.
 
+The formatter version is pinned in the root lint dependency group and resolved in `uv.lock`.
+The creator, local hook, and CMake targets all use that version through uv. Configure CMake
+with uv on PATH to enable the formatting targets; the analysis preset requires it. Ordinary
+native compilation needs neither uv nor Python.
+
 ```bash
 cmake --build --preset dev --target format-c
 cmake --build --preset dev --target format-c-check
 ```
 
 The first command changes files. The second is read-only and is the appropriate CI gate.
+Both invoke `uv run --locked` in the project, which can synchronize development dependencies
+on first use. For offline work, populate uv's Python and dependency caches beforehand and set
+`UV_OFFLINE=1`. CMake configuration itself does not install anything. Reconfigure after adding
+uv to PATH if the formatting targets were previously unavailable.
 
 ## clang-tidy
 

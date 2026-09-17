@@ -146,6 +146,110 @@ def test_unknown_fields(recipe: dict[str, Any], snapshot: Snapshot, change: str)
         validate(recipe, snapshot)
 
 
+@pytest.mark.parametrize(
+    "section,key", [("project", "name"), ("author", "name"), ("license", "holder")]
+)
+def test_long_display_metadata(
+    recipe: dict[str, Any], snapshot: Snapshot, tmp_path: Path, section: str, key: str
+) -> None:
+    import ast
+
+    value = 'Research "café" \\ infrastructure — 研究 🚀 ' * 10
+    recipe[section][key] = value
+    recipe["github"]["docs_url"] = "https://docs.acme.invalid/" + "long-path/" * 20
+    files = render(snapshot, validate(recipe, snapshot))
+    path = tmp_path / "conf.py"
+    path.write_bytes(files["tools/sphinx/conf.py"])
+    for arguments in (["format", str(path)], ["check", "--select", "E501", str(path)]):
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+    assignments = {
+        node.targets[0].id: ast.literal_eval(node.value)
+        for node in ast.parse(path.read_text(encoding="utf-8")).body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id in {"project", "author", "copyright", "html_baseurl"}
+    }
+    assert assignments == {
+        "project": recipe["project"]["name"],
+        "author": recipe["author"]["name"],
+        "copyright": f"2026, {recipe['license']['holder']}",
+        "html_baseurl": recipe["github"]["docs_url"],
+    }
+
+
+@pytest.mark.parametrize("command", ["validate", "generate"])
+def test_slug_too_long_before_generation(
+    recipe: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    recipe["project"]["slug"] = recipe["github"]["repository"] = "a" * 101
+    path = tmp_path / "recipe.toml"
+    save(Config(recipe), path)
+    probe = Mock(side_effect=AssertionError("invalid recipes must not run uv"))
+    monkeypatch.setattr(generate, "require_uv", probe)
+    arguments = [command, "--config", str(path)]
+    if command == "generate":
+        arguments += ["--output", str(tmp_path / "generated")]
+    assert cli.main(arguments) == 1
+    assert "project.slug: use at most 100 characters" in capsys.readouterr().err
+    probe.assert_not_called()
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_wizard_corrects_slug_immediately(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from template_creator.wizard import section
+
+    answers = iter(["Acme", "a" * 101, "valid-slug", "Description", "acme", "0.1.0"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    data: dict[str, Any] = {}
+    section(1, data)
+    assert data["project"]["slug"] == "valid-slug"
+    assert "project.slug: use at most 100 characters" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("output", [b"partial output\xff", "partial output", None])
+def test_generation_timeout_preserves_diagnostics_and_recipe(
+    config: Config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    output: str | bytes | None,
+) -> None:
+    recipe = tmp_path / "recipe.toml"
+    save(config, recipe)
+    original = recipe.read_bytes()
+    monkeypatch.setattr(generate, "require_uv", lambda: "uv")
+    monkeypatch.setattr(
+        generate.subprocess,
+        "run",
+        Mock(
+            side_effect=subprocess.TimeoutExpired(["uv", "lock"], 300, output=output, stderr=output)
+        ),
+    )
+    assert (
+        cli.main(["generate", "--config", str(recipe), "--output", str(tmp_path / "generated")])
+        == 1
+    )
+    message = capsys.readouterr().err
+    assert "uv lock timed out after 300 seconds" in message
+    if output:
+        assert message.count("partial output") == 2
+    assert recipe.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [recipe]
+
+
 @pytest.mark.parametrize("choice", LICENSES)
 def test_licenses(recipe: dict[str, Any], snapshot: Snapshot, choice: str) -> None:
     recipe["license"]["choice"] = choice

@@ -113,7 +113,7 @@ def test_all_missing_tools_are_reported(
     monkeypatch.setenv("CC", compiler)
     assert cli.main(arguments) == 1
     output = capsys.readouterr().out
-    for name in ("CMake", "Ninja", "clang-format", "clang-tidy", "cppcheck"):
+    for name in ("CMake", "Ninja", "uv", "clang-tidy", "cppcheck"):
         assert f"FAIL {name}" in output
 
 

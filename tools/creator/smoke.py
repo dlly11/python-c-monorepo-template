@@ -32,7 +32,10 @@ def main() -> None:
         {
             "schema_version": 1,
             "project": {
-                "name": 'Acme "Research"',
+                "name": (
+                    'Acme "Research 研究" — an international collaboration for scientific '
+                    "software, infrastructure, and reproducible experiments"
+                ),
                 "slug": slug,
                 "description": "Research tools.",
                 "prefix": "acme_research_infrastructure_lab",
@@ -43,7 +46,11 @@ def main() -> None:
                 "repository": slug,
                 "docs_url": "https://acme.invalid/docs/",
             },
-            "author": {"name": "Ada Researcher", "email": "ada+research@acme.invalid"},
+            "author": {
+                "name": "Ada Researcher and the International Collaboration for "
+                "Scientific Software, Infrastructure, and Reproducible Experiments",
+                "email": "ada+research@acme.invalid",
+            },
             "security": {"contact": "security@acme.invalid"},
             "ownership": {"default": ["@ada"], "rules": []},
             "license": {"choice": "MIT", "holder": "Acme Research", "year": 2026, "text": ""},
@@ -126,6 +133,7 @@ def main() -> None:
         ],
         ["cmake", "--preset", "dev"],
         ["cmake", "--build", "--preset", "dev"],
+        ["cmake", "--build", "--preset", "dev", "--target", "format-c-check"],
         ["ctest", "--preset", "dev"],
         ["cmake", "--install", "build/dev", "--prefix", "build/stage"],
         ["uv", "run", "--no-sync", "repo-tools", "check-native-install", "build/stage"],

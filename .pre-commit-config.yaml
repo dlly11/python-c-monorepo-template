@@ -62,7 +62,7 @@ repos:
 
       - id: clang-format
         name: clang-format check
-        entry: clang-format --dry-run --Werror
+        entry: uv run --locked clang-format --dry-run --Werror
         language: system
         files: ^native/.*\.(c|cpp|h)$
 

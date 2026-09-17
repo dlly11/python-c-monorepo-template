@@ -13,7 +13,8 @@ native, analysis, documentation, and coverage tools can be installed when those 
 | CMake | 3.25 or newer |
 | Ninja | Required by the presets |
 | C / C++ compiler | C17 / C++17; C++ is needed for native tests |
-| clang-format / clang-tidy / cppcheck | Required for native analysis |
+| clang-format | Installed by uv from the pinned lint dependency group |
+| clang-tidy / cppcheck | System tools required for native analysis |
 | Doxygen | 1.9.2 or newer |
 | gcov | The same GCC toolchain used for coverage |
 
@@ -27,7 +28,7 @@ In Bash, install the native tools and uv:
 
 ```bash
 sudo apt-get update
-sudo apt-get install --yes build-essential cmake ninja-build clang-format clang-tidy cppcheck doxygen curl
+sudo apt-get install --yes build-essential cmake ninja-build clang-tidy cppcheck doxygen curl
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
@@ -58,7 +59,7 @@ export CXX=/usr/bin/clang++
 ```
 
 The explicit compiler paths retain Apple Clang for builds, matching CI. Homebrew's
-[LLVM formula](https://formulae.brew.sh/formula/llvm) supplies clang-format and clang-tidy and is
+[LLVM formula](https://formulae.brew.sh/formula/llvm) supplies clang-tidy and is
 keg-only, so its `bin` directory must be added to PATH. Add the exports to your shell profile if you
 want them in new terminals. Run native coverage on Linux; the coverage preset is unavailable on macOS.
 
@@ -80,7 +81,7 @@ pacman -S --needed mingw-w64-ucrt-x86_64-clang-tools-extra mingw-w64-ucrt-x86_64
 Use the UCRT64 packages consistently; MSYS2 documents its different
 [compiler/runtime environments](https://www.msys2.org/docs/environments/).
 The [Clang extra tools package](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-clang-tools-extra)
-provides clang-tidy and depends on Clang, which also supplies clang-format.
+provides clang-tidy and depends on Clang. Repository formatting uses the uv-managed formatter.
 
 Install native Windows uv from PowerShell:
 
@@ -120,7 +121,9 @@ launcher used before installation.
 For native work, set `CC` and `CXX` before the first CMake configure. Use a fresh build directory
 when changing compiler families: an existing cache retains its compiler selection. Check native
 prerequisites with `python tools/repo_tools/run.py doctor --profile native`, or use `--profile analysis` for
-the static analysis tools. See [native dependency setup](native-quality.md#cpputest-dependency-policy)
+uv and the system analysis tools. Sync installs clang-format with the other development tools;
+the hook and CMake formatting targets select it through uv. See [formatting](native-quality.md#clang-format)
+for first-use and offline behavior, and [native dependency setup](native-quality.md#cpputest-dependency-policy)
 for restricted/offline builds.
 
 Install local hooks as described in [Contributing](CONTRIBUTING.md), then follow the
@@ -137,7 +140,7 @@ Using the `uv run` prefix above can synchronize the workspace before the command
 | --- | --- |
 | `python` | uv |
 | `native` | CMake, Ninja, C and C++ compilers |
-| `analysis` | Native tools plus clang-format, clang-tidy, and cppcheck |
+| `analysis` | Native tools plus uv, clang-tidy, and cppcheck |
 | `docs` | uv, CMake, Ninja, C compiler, Doxygen |
 | `coverage` | uv, CMake, Ninja, GCC, G++, gcov; requires Linux |
 | `all` (default) | All applicable tools; skips native coverage outside Linux |
