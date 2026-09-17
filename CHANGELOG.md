@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.0...v2.0.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **creator:** sanitize the environment when checking uv ([3f27457](https://github.com/dlly11/python-c-monorepo-template/commit/3f27457d05b063db5f59942e750fae92c8675c8a))
+
 ## [2.0.0](https://github.com/dlly11/python-c-monorepo-template/compare/v1.2.0...v2.0.0) (2026-09-17)
 
 
