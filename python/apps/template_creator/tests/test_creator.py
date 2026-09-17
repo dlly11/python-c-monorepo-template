@@ -64,6 +64,74 @@ def test_invalid_config(
         validate(recipe, snapshot)
 
 
+@pytest.mark.parametrize(
+    "email",
+    [
+        "ada@acme.invalid",
+        "ada+research@acme.invalid",
+        "12345+ada@users.noreply.github.com",
+    ],
+)
+def test_package_author_email(recipe: dict[str, Any], snapshot: Snapshot, email: str) -> None:
+    recipe["author"]["email"] = email
+    assert validate(recipe, snapshot).data["author"]["email"] == email
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "41898282+github-actions[bot]@users.noreply.github.com",
+        "ada..research@acme.invalid",
+        "ada@acme.invalid,other@acme.invalid",
+    ],
+)
+@pytest.mark.parametrize("command", ["validate", "generate"])
+def test_invalid_author_email_fails_before_generation(
+    recipe: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    email: str,
+    command: str,
+) -> None:
+    recipe["author"]["email"] = email
+    path = tmp_path / "recipe.toml"
+    save(Config(recipe), path)
+    probe = Mock(side_effect=AssertionError("invalid recipes must not run uv"))
+    monkeypatch.setattr(generate, "require_uv", probe)
+    arguments = [command, "--config", str(path)]
+    output = tmp_path / "generated"
+    if command == "generate":
+        arguments.extend(["--output", str(output)])
+    assert cli.main(arguments) == 1
+    assert "author.email:" in capsys.readouterr().err
+    probe.assert_not_called()
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("slug", ["release-ci-experiments-20260917-candidate", "a" * 100])
+def test_long_slug_python_formatting(
+    recipe: dict[str, Any], snapshot: Snapshot, tmp_path: Path, slug: str
+) -> None:
+    recipe["project"]["slug"] = recipe["github"]["repository"] = slug
+    for name, content in render(snapshot, validate(recipe, snapshot)).items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    # Exercise the formatter's actual limitations: long string literals cannot
+    # always be repaired after template substitutions.
+    for arguments in (["format", "."], ["check", "--select", "E501", "."]):
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", *arguments],
+            cwd=tmp_path,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.parametrize("change", ["top", "nested", "schema", "missing"])
 def test_unknown_fields(recipe: dict[str, Any], snapshot: Snapshot, change: str) -> None:
     if change == "top":
@@ -512,8 +580,15 @@ def test_wizard_custom_license_and_rules(
         wizard(snapshot, path)
 
 
+@pytest.mark.parametrize(
+    "email", ["invalid-email", "41898282+github-actions[bot]@users.noreply.github.com"]
+)
 def test_wizard_validation_correction(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, snapshot: Snapshot
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    snapshot: Snapshot,
+    capsys: pytest.CaptureFixture[str],
+    email: str,
 ) -> None:
     answers = iter(
         [
@@ -525,7 +600,7 @@ def test_wizard_validation_correction(
             "ada",
             "",
             "Ada",
-            "invalid-email",
+            email,
             "security@acme.invalid",
             "@ada",
             "no",
@@ -542,6 +617,7 @@ def test_wizard_validation_correction(
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     wizard(snapshot, tmp_path / "config.toml")
     assert load(tmp_path / "config.toml", snapshot).prefix == "acme"
+    assert "author.email:" in capsys.readouterr().out
 
 
 def test_wizard_corrects_invalid_owners_at_prompt(
