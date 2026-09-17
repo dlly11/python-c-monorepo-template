@@ -1,11 +1,11 @@
 {
-  ".": "2.0.4",
-  "python/packages/core": "2.0.4",
-  "python/packages/package_a": "2.0.4",
-  "python/packages/package_b": "2.0.4",
-  "python/apps/package_a_cli": "2.0.4",
-  "native/packages/core": "2.0.4",
-  "native/packages/package_a": "2.0.4",
-  "native/packages/package_b": "2.0.4",
-  "native/apps/package_a_cli": "2.0.4"
+  ".": "3.0.0",
+  "python/packages/core": "3.0.0",
+  "python/packages/package_a": "3.0.0",
+  "python/packages/package_b": "3.0.0",
+  "python/apps/package_a_cli": "3.0.0",
+  "native/packages/core": "3.0.0",
+  "native/packages/package_a": "3.0.0",
+  "native/packages/package_b": "3.0.0",
+  "native/apps/package_a_cli": "3.0.0"
 }
