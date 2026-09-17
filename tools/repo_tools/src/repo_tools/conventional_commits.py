@@ -92,6 +92,37 @@ def valid_subject(subject: str) -> bool:
     )
 
 
+def check_commit(commit: str, *, base: str, root: Path | None = None) -> bool:
+    """Check a preserved commit, exempting only proven base-branch synchronization merges."""
+    parents = git("show", "--no-patch", "--format=%P", commit, "--", root=root).split()
+    if len(parents) == 2 and base not in {"0" * 40, "0" * 64}:
+        baseline = git(
+            "rev-parse", "--verify", "--end-of-options", f"{base}^{{commit}}", root=root
+        ).strip()
+
+        def in_base(parent: str) -> bool:
+            try:
+                git("merge-base", "--is-ancestor", parent, baseline, root=root)
+            except subprocess.CalledProcessError as error:
+                if error.returncode != 1:
+                    raise
+                return False
+            return True
+
+        # GitHub's Update branch merges main into the PR: first parent is the PR,
+        # second parent is main (possibly older than the current base). Check the
+        # graph, not the subject or author; regular and unrelated merges stay linted.
+        if in_base(parents[1]) and not in_base(parents[0]):
+            print(f"Exempt base-branch synchronization merge: {commit[:12]}")
+            return True
+    return check_message(
+        git("show", "--no-patch", "--format=%B", commit, "--", root=root),
+        commit[:12],
+        root=root,
+        revision=commit,
+    )
+
+
 def check_message(
     message: str, label: str, *, root: Path | None = None, revision: str | None = None
 ) -> bool:

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from repo_tools.conventional_commits import check_message
+from repo_tools.conventional_commits import check_commit, check_message
 from repo_tools.github_api import api, gh, items, repository_name
 from repo_tools.repository_metadata import git
 
@@ -231,12 +231,7 @@ def merged_pr(
         # fresh manual CI on main has no new commit range to lint.
         introduced = git("rev-list", f"{parents[0]}..{parents[1]}", "--", root=root).splitlines()
         for sha in introduced:
-            if not check_message(
-                git("show", "--no-patch", "--format=%B", sha, "--", root=root),
-                sha[:12],
-                root=root,
-                revision=sha,
-            ):
+            if not check_commit(sha, base=parents[0], root=root):
                 raise ValueError("merged PR commit subject is not conventional")
     else:
         # GitHub records the last rebased SHA as merge_commit_sha. Its commit-to-PR

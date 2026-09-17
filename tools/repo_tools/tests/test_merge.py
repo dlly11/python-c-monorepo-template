@@ -344,3 +344,61 @@ def test_missing_merged_evidence_explains_current_recovery(merge_context, monkey
     assert "current main" in message and "recovery-run-id" in message
     assert "Historical schema-1" in message
     assert "retry PR CI within 30 days" not in message
+
+
+@pytest.mark.parametrize("invalid_inner", [False, True])
+def test_preserved_base_update_merge_is_supported(
+    merge_context: tuple[ModuleType, dict[str, Any]], invalid_inner: bool
+) -> None:
+    module, state = merge_context
+    git = state["git"]
+    # A real branch update has the PR as first parent and an advanced main as second.
+    topic = git(
+        "commit-tree",
+        state["tree"],
+        "-p",
+        state["base"],
+        "-m",
+        "Invalid dependency update" if invalid_inner else "chore(deps): update",
+    )
+    base = git("commit-tree", state["tree"], "-p", state["base"], "-m", "fix: advance main")
+    updated = git(
+        "commit-tree",
+        state["tree"],
+        "-p",
+        topic,
+        "-p",
+        base,
+        "-m",
+        "Merge branch 'main' into dependabot/update",
+    )
+    merged = git(
+        "commit-tree",
+        state["tree"],
+        "-p",
+        base,
+        "-p",
+        updated,
+        "-m",
+        "chore(deps): update (#1)",
+    )
+    state["pr"]["head"]["sha"] = updated
+    state["pr"]["merge_commit_sha"] = merged
+    if invalid_inner:
+        with pytest.raises(ValueError, match="PR commit subject"):
+            module.merged_pr(REPOSITORY, merged)
+    else:
+        assert module.merged_pr(REPOSITORY, merged) == (state["pr"], [merged])
+    # Even if it resembles an update merge, the final main subject remains mandatory.
+    invalid_final = git(
+        "commit-tree",
+        state["tree"],
+        "-p",
+        base,
+        "-p",
+        updated,
+        "-m",
+        "Merge branch 'main' into topic",
+    )
+    with pytest.raises(ValueError, match="merged commit subject"):
+        module.merged_pr(REPOSITORY, invalid_final)

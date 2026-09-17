@@ -135,3 +135,61 @@ def test_missing_or_option_like_ref_fails_closed(
 def test_missing_message_file_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     arguments = ["check-commits", "--message-file", str(tmp_path / "missing")]
     assert cli.main(arguments) == 1
+
+
+@pytest.mark.parametrize("advance_base", [False, True])
+@pytest.mark.parametrize("invalid_subject", [False, True])
+def test_update_branch_merge_checks_its_regular_commits(
+    git_repository: Callable[..., str],
+    capsys: pytest.CaptureFixture[str],
+    advance_base: bool,
+    invalid_subject: bool,
+) -> None:
+    git = git_repository
+    git("switch", "-c", "dependabot/update")
+    git(
+        "commit",
+        "--allow-empty",
+        "-m",
+        "Invalid change" if invalid_subject else "chore(deps): update",
+    )
+    git("switch", "main")
+    git("commit", "--allow-empty", "-m", "Unrelated base history")
+    base = git("rev-parse", "HEAD")
+    git("switch", "dependabot/update")
+    git("merge", "--no-ff", "main", "-m", "Merge branch 'main' into dependabot/update")
+    head = git("rev-parse", "HEAD")
+    if advance_base:
+        git("switch", "main")
+        git("commit", "--allow-empty", "-m", "More base history")
+        base = git("rev-parse", "HEAD")
+    assert cli.main(["check-commits", "--base", base, "--head", head]) == int(invalid_subject)
+    captured = capsys.readouterr()
+    assert "Exempt base-branch synchronization merge" in captured.out
+    assert "Unrelated base history" not in captured.err
+    assert ("Invalid change" in captured.err) == invalid_subject
+
+
+@pytest.mark.parametrize("kind", ["ordinary", "side-branch", "reverse", "octopus"])
+def test_merge_subject_alone_cannot_bypass_policy(
+    git_repository: Callable[..., str], kind: str
+) -> None:
+    git = git_repository
+    base = git("rev-parse", "HEAD")
+    tree = git("rev-parse", "HEAD^{tree}")
+    topic = git("commit-tree", tree, "-p", base, "-m", "fix: change")
+    side = git("commit-tree", tree, "-p", base, "-m", "fix: other change")
+    parents = {
+        "ordinary": [topic],
+        "side-branch": [topic, side],
+        "reverse": [base, topic],
+        "octopus": [topic, base, side],
+    }[kind]
+    head = git(
+        "commit-tree",
+        tree,
+        *(arg for parent in parents for arg in ("-p", parent)),
+        "-m",
+        "Merge branch 'main' into topic",
+    )
+    assert cli.main(["check-commits", "--base", base, "--head", head]) == 1

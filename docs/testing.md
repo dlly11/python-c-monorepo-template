@@ -56,6 +56,11 @@ Git tree with the recorded tested tree. A merge commit must have the PR head as 
 the verifier also checks subjects of the preserved PR commits newly introduced to main. Intermediate
 PR commits do not need their own validation records: CI certifies the final integrated contents.
 
+PR range checks and preserved-commit verification share the same narrow exception for merges
+that synchronize the base branch into the PR, including GitHub's **Update branch** button.
+The second parent must be an ancestor of the checked base, and the first parent must be outside
+that history. The final main commit remains subject to the normal Conventional Commit check.
+
 For a rebase, GitHub's `merge_commit_sha` identifies the final rewritten commit. The verifier groups
 the contiguous preceding commits using GitHub's [commit-to-PR associations](https://docs.github.com/en/rest/commits/commits#list-pull-requests-associated-with-a-commit),
 validates each subject, and compares only the final tree with the PR record. Every new first-parent

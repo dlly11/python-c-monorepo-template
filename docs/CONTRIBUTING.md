@@ -13,8 +13,8 @@ and native checks locally, with coverage enforced by Linux CI.
 
 ## Commit messages and pull requests
 
-Use a Conventional Commit subject for every new commit and the PR title, for example
-`feat(package-a): add JSON output`. Install both local hooks after synchronizing the workspace:
+Use a Conventional Commit subject for authored commits and the PR title, for example
+`feat(python-package-a): add JSON output`. Install both local hooks after synchronizing the workspace:
 
 ```bash
 uv run pre-commit install
@@ -26,7 +26,7 @@ PR-title validator. Bodies and footers remain free-form. File checks run at the 
 Manual checks:
 
 ```bash
-uv run repo-tools check-pr-title "feat(package-a): add JSON output"
+uv run repo-tools check-pr-title "feat(python-package-a): add JSON output"
 COMMIT_MESSAGE_FILE=$(git rev-parse --git-path COMMIT_EDITMSG)
 uv run repo-tools check-commits --message-file "${COMMIT_MESSAGE_FILE}"
 git fetch origin
@@ -47,10 +47,11 @@ commit attempt; before then, create a temporary text file containing your propos
 pass its path instead. Quoting the path also supports directories containing spaces.
 
 If a new commit is rejected, correct its subject and retry. For the latest existing commit, use
-`git commit --amend -m "fix(core): handle empty input"`. For older commits on your PR branch, use
+`git commit --amend -m "fix(python-core): handle empty input"`. For older commits on your PR branch, use
 `git rebase -i origin/main` and mark the affected commits `reword`; resolve any `fixup!` or `squash!`
-commits before submitting. Rebase onto `origin/main` when updating a branch. Default Git merge and
-revert messages also fail the subject policy; supply a subject such as `revert: undo JSON output`.
+commits before submitting. To update a branch, rebase onto `origin/main` or use GitHub's
+**Update branch** button, as described below. Local commit-message hooks reject default Git merge
+and revert messages; supply a conventional subject such as `revert: undo JSON output`.
 After rewriting an already pushed branch, coordinate with anyone using it and push with
 `git push --force-with-lease`.
 
@@ -67,6 +68,15 @@ build matrix. GitHub supports three merge methods here:
 Keep the validated title when confirming a squash or merge commit. Rebase does not create a
 commit from the PR title or description. All methods reuse the PR's successful CI by verifying
 that the final integrated contents match what was tested.
+
+GitHub's **Update branch** merge is supported. Commit-range checks exempt synchronization
+merges whose second parent belongs to the PR's base history and whose first parent is outside it.
+They check Git ancestry, not a `Merge ...` message or bot identity. The same exception applies
+when verifying preserved PR commits after merging or during release recovery. Ordinary commits,
+unrelated merges, PR titles, and the final merge into main still require conventional subjects.
+For a local merge, the commit-message hook still requires a conventional message because it runs
+before the commit exists. Describe behavior changes from conflict resolution in a separate
+conventional commit so they have an explicit release signal.
 
 Put `!` in the PR title for breaking changes and in the relevant individual commit when preserving
 commits. For a rebase, a breaking marker only in the PR title will not reach the commit history.
