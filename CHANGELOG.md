@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/dlly11/python-c-monorepo-template/compare/v3.0.0...v3.0.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **ci:** allow verified base-branch synchronization merges ([9135b9c](https://github.com/dlly11/python-c-monorepo-template/commit/9135b9c5c755ba049fcb7b26f539574b81dce623))
+
 ## [3.0.0](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.4...v3.0.0) (2026-09-17)
 
 
