@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.2...v2.0.3) (2026-09-17)
+
+
+### Bug Fixes
+
+* isolate release publication and validate creator inputs ([0467b4f](https://github.com/dlly11/python-c-monorepo-template/commit/0467b4f28801543536f02d1ce3b037e8ad226dfb))
+
 ## [2.0.2](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.1...v2.0.2) (2026-09-17)
 
 
