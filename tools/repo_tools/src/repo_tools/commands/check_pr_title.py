@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from repo_tools.conventional_commits import valid_subject
+from repo_tools.conventional_commits import check_message, valid_subject
 from repo_tools.github_api import api, repository_name
 
 
@@ -72,9 +72,9 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
     except (KeyError, RuntimeError, TypeError, ValueError) as error:
         print(f"cannot validate PR title: {error}", file=sys.stderr)
         return 1
-    if title is None or not valid_subject(title):
+    if title is None or not valid_subject(title) or not check_message(title, "PR title", root=root):
         print(f"invalid Conventional Commit pull request title: {title!r}", file=sys.stderr)
-        print("example: feat(package-a): add JSON output", file=sys.stderr)
+        print("example: feat(python-package-a): add JSON output", file=sys.stderr)
         return 1
     print(f"valid Conventional Commit pull request title: {title}")
     return 0

@@ -14,26 +14,6 @@
         },
         {
           "type": "toml",
-          "path": "python/packages/core/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "python/packages/package_a/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "python/packages/package_b/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "python/apps/package_a_cli/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
           "path": "python/apps/template_creator/pyproject.toml",
           "jsonpath": "$.project.version"
         },
@@ -41,7 +21,120 @@
           "type": "generic",
           "path": "CMakeLists.txt"
         }
+      ],
+      "component": "template",
+      "exclude-paths": [
+        "python/packages/core",
+        "python/packages/package_a",
+        "python/packages/package_b",
+        "python/apps/package_a_cli",
+        "native/packages/core",
+        "native/packages/package_a",
+        "native/packages/package_b",
+        "native/apps/package_a_cli"
       ]
+    },
+    "python/packages/core": {
+      "release-type": "python",
+      "component": "python-core",
+      "package-name": "python-core"
+    },
+    "python/packages/package_a": {
+      "release-type": "python",
+      "component": "python-package-a",
+      "package-name": "python-package-a"
+    },
+    "python/packages/package_b": {
+      "release-type": "python",
+      "component": "python-package-b",
+      "package-name": "python-package-b"
+    },
+    "python/apps/package_a_cli": {
+      "release-type": "python",
+      "component": "python-package-a-cli",
+      "package-name": "python-package-a-cli"
+    },
+    "native/packages/core": {
+      "release-type": "simple",
+      "component": "native-core",
+      "package-name": "native-core"
+    },
+    "native/packages/package_a": {
+      "release-type": "simple",
+      "component": "native-package-a",
+      "package-name": "native-package-a"
+    },
+    "native/packages/package_b": {
+      "release-type": "simple",
+      "component": "native-package-b",
+      "package-name": "native-package-b"
+    },
+    "native/apps/package_a_cli": {
+      "release-type": "simple",
+      "component": "native-package-a-cli",
+      "package-name": "native-package-a-cli"
     }
-  }
+  },
+  "separate-pull-requests": false,
+  "group-pull-request-title-pattern": "chore: release ${branch}",
+  "bootstrap-sha": "bf94b23ed43bc360e167c50d54915382106f3d69",
+  "include-v-in-tag": true,
+  "include-component-in-tag": true,
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features",
+      "hidden": false
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes",
+      "hidden": false
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements",
+      "hidden": false
+    },
+    {
+      "type": "docs",
+      "section": "Documentation",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous Chores",
+      "hidden": true
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "section": "Build System",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "Continuous Integration",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "Styles",
+      "hidden": true
+    },
+    {
+      "type": "revert",
+      "section": "Reverts",
+      "hidden": true
+    }
+  ]
 }

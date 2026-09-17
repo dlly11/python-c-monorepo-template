@@ -72,9 +72,11 @@ C++ programs can link to the C implementation.
 2. Give the distribution and import package organization-unique names.
 3. Add the member to `[tool.uv.workspace].members` if it is outside the existing glob.
 4. Declare workspace dependencies normally and add their sources to `[tool.uv.sources]`.
-5. Set its version to `version.txt`. Type checks, version checks, and the setter discover members
-   from the workspace; no command project lists need updating.
-6. Register `project.version` in Release Please's `extra-files` and add the import package to
+5. Choose its own initial version and add a `python` strategy entry with a unique `component` ID
+   under its path in the Release Please config. Add the same path/version to the manifest and a
+   component `CHANGELOG.md`. The ID automatically becomes an allowed commit scope.
+   If retaining the upstream template release, add the new path to its `exclude-paths` too.
+6. Add the import package to
    coverage's `source` list and Ruff's `known-first-party` list in the root `pyproject.toml`.
 7. Add a `SmokeCheck` to `SMOKE_CHECKS` in `tools/repo_tools/src/repo_tools/python_smoke_checks.py`,
    with a public API example and `SmokeCommand` cases for any installed CLI.
@@ -103,8 +105,10 @@ existing CMake and install checks; documentation links are validated by the Sphi
 4. Apply `monorepo_set_project_options` to production C targets and
    `monorepo_set_cpp_test_options` to CppUTest executables.
 5. Link only to explicitly declared targets and register the test with CTest.
-6. Add install rules for the library, public headers, and the shared `MonorepoTemplateTargets`
-   export. Set `EXPORT_NAME` and build/install include directories like the existing libraries.
+6. Create a component `version.txt` and `CHANGELOG.md`; register its path, unique ID, and `simple`
+   strategy in Release Please and seed its manifest version. Call `monorepo_component` before
+   creating its version header, and `monorepo_install_component` with its dependency targets.
+   Give it a unique CMake package name, `EXPORT_NAME`, and build/install include directories.
 7. Add the directory to the root `CMakeLists.txt`.
 8. Register the installed version header and macro prefix in `tools/repo_tools/src/repo_tools/commands/check_native_install.py`.
    Extend `native/tests/install_consumer` to link and exercise the new library and version header.
@@ -129,14 +133,30 @@ cmake --build build/install-consumer
 ctest --test-dir build/install-consumer --output-on-failure
 ```
 
-Downstream CMake projects use `find_package(MonorepoTemplate CONFIG REQUIRED)` and link the
-`example::core`, `example::package_a`, or `example::package_b` targets. The install tree can be
-moved without changing its generated CMake files.
+Each library has a separate CMake package and archive:
 
-Package configuration is installed beneath `<libdir>/cmake/MonorepoTemplate`. Consumers that
-previously set `MonorepoTemplate_DIR` directly to `<libdir>/cmake/monorepo-template` must update
-that path. Prefer `CMAKE_PREFIX_PATH` pointing at the installation prefix. Verify upgrades with a
-clean install tree so obsolete configuration files from an older installation do not interfere.
+| Component | CMake package | Imported target |
+| --- | --- | --- |
+| Core | `ExampleCore` | `example::core` |
+| Package A | `ExamplePackageA` | `example::package_a` |
+| Package B | `ExamplePackageB` | `example::package_b` |
+| CLI | `ExamplePackageACli` | `example::package_a_cli` |
+
+```cmake
+find_package(ExamplePackageA 2 CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE example::package_a)
+```
+
+Install dependency archives into the same prefix (or include their prefixes in `CMAKE_PREFIX_PATH`).
+Package A/B locate core using their built-against minimum version and the same major version;
+an absent, older, or different-major dependency fails configuration. The CLI is statically linked
+and runs from its own archive without installing library archives. Archives include version headers,
+license text, and `share/<component>/component-versions.txt` provenance. The installed tree is relocatable.
+
+**Migration:** replace `find_package(MonorepoTemplate)` with the packages you consume. The old
+aggregate config has been removed; target names remain unchanged. Use a clean install prefix to
+avoid stale configs, and set `CMAKE_PREFIX_PATH` instead of the old `MonorepoTemplate_DIR`.
+Configs now live under `<libdir>/cmake/<PackageName>`. See [releases](releases.md) for rebuild policy.
 
 ## Cross-language integration
 
@@ -149,7 +169,7 @@ making every Python package depend on the native build.
 ## Repository creator
 
 The upstream-only `monorepo-template-creator` application is a normal Python workspace member
-with the repository's release version. It has no dependency on the example packages or private
+with the template's release version. It has no dependency on the example packages or private
 maintenance package. Its wheel includes a versioned snapshot assembled from explicitly classified
 canonical files during standard PEP 517 builds; source distributions retain that snapshot.
 

@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from repo_tools.components import component_errors, configured_components, legacy_config
 from repo_tools.repository_metadata import (
     VERSION_PATTERN,
     cmake_project_version,
@@ -26,7 +27,10 @@ MANIFEST = "tools/release-please/manifest.json"
 
 
 def release_branch(config: dict[str, Any], target: str = "main") -> str:
-    """Support the template's single-root simple strategy, including renamed projects."""
+    """Recognize the combined branch, retaining historical lockstep identity checks."""
+    if isinstance(config, dict) and not legacy_config(config):
+        configured_components(config)
+        return f"release-please--branches--{target}"
     if (
         not isinstance(config, dict)
         or not isinstance(config.get("packages"), dict)
@@ -125,7 +129,7 @@ def lock_change(before: str, after: str, projects: dict[Path, str], old: str, ne
     return seen == {name for name, _ in expected} and original == changed
 
 
-def release_changes(root: Path, base: str, head: str) -> tuple[bool, str]:
+def legacy_release_changes(root: Path, base: str, head: str) -> tuple[bool, str]:
     """Return an explanatory full-CI fallback for anything outside the release transform."""
     try:
         previous, current = tree(root, base), tree(root, head)
@@ -202,3 +206,110 @@ def release_changes(root: Path, base: str, head: str) -> tuple[bool, str]:
     ) as error:
         return False, f"unsupported release metadata: {error}"
     return True, "only consistent version metadata and a new changelog entry changed"
+
+
+def changelog_change(before: str, after: str, version: str) -> bool:
+    header = "# Changelog\n\n"
+    prior = before.removeprefix(header)
+    inserted = after[len(header) : len(after) - len(prior)] if prior else after[len(header) :]
+    return (
+        before.startswith(header)
+        and after.startswith(header)
+        and after.endswith(prior)
+        and re.match(rf"## (?:\[)?{re.escape(version)}(?:\]|\s|$)", inserted) is not None
+    )
+
+
+def component_lock_change(before: str, after: str, changes: dict[str, tuple[str, str]]) -> bool:
+    """Normalize only the explicitly changed workspace package versions."""
+    original, changed = tomllib.loads(before), tomllib.loads(after)
+    seen = set()
+    for package in changed["package"]:
+        name = package["name"]
+        if name in changes:
+            old, new = changes[name]
+            if name in seen or package.get("version") != new:
+                return False
+            seen.add(name)
+            package["version"] = old
+    return seen == changes.keys() and original == changed
+
+
+def release_changes(root: Path, base: str, head: str) -> tuple[bool, str]:
+    """Allow exact release transforms for any nonempty subset of components."""
+    try:
+        config = json.loads(git("show", f"{base}:{CONFIG}", root=root))
+        if legacy_config(config):
+            return legacy_release_changes(root, base, head)
+        components = configured_components(config)
+        previous, current = tree(root, base), tree(root, head)
+        if previous.keys() != current.keys() or any(
+            previous[p][0] != current[p][0] for p in previous
+        ):
+            return False, "paths or file modes changed"
+        old_manifest = json.loads(git("show", f"{base}:{MANIFEST}", root=root))
+        new_manifest = json.loads(git("show", f"{head}:{MANIFEST}", root=root))
+        if old_manifest.keys() != new_manifest.keys() or set(old_manifest) != {
+            c.path for c in components
+        }:
+            return False, "release component registrations changed"
+        allowed = {MANIFEST, "uv.lock"}
+        if any(previous.get(name, (None,))[0] != "100644" for name in allowed):
+            return False, "release manifest and lock must be regular files"
+        metadata = {}
+        lock_versions = {}
+        with snapshot(root, base) as baseline, snapshot(root, head) as proposed:
+            if errors := component_errors(baseline) + component_errors(proposed):
+                return False, "; ".join(errors)
+            projects = python_projects(baseline)
+            for component in components:
+                old, new = old_manifest[component.path], new_manifest[component.path]
+                if old == new:
+                    continue
+                if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
+                    return False, f"{component.id}: release version must increase"
+                for name in (*component.files, component.changelog):
+                    allowed.add(name)
+                    metadata[name] = old, new, name == component.changelog
+                for name in component.files:
+                    if Path(name) in projects:
+                        lock_versions[projects[Path(name)]] = old, new
+            if not metadata:
+                return False, "no component version increased"
+            changed_paths = {p for p in previous if previous[p] != current[p]}
+            if changed_paths - allowed:
+                return False, "non-release files changed: " + ", ".join(
+                    sorted(changed_paths - allowed)
+                )
+            for name, (old, new, changelog) in metadata.items():
+                if previous.get(name, (None,))[0] != "100644":
+                    return False, f"unsupported release file: {name}"
+                before = (baseline / name).read_text(encoding="utf-8")
+                after = (proposed / name).read_text(encoding="utf-8")
+                if changelog:
+                    valid = changelog_change(before, after, new)
+                elif name.endswith("pyproject.toml"):
+                    valid = project_version_change(before, after, old, new)
+                elif name == "CMakeLists.txt":
+                    version, start, end = cmake_project_version(before)
+                    valid = version == old and after == before[:start] + new + before[end:]
+                else:
+                    valid = before == old + "\n" and after == new + "\n"
+                if not valid:
+                    return False, f"unexpected changes in {name}"
+            if not component_lock_change(
+                (baseline / "uv.lock").read_text(),
+                (proposed / "uv.lock").read_text(),
+                lock_versions,
+            ):
+                return False, "unexpected changes in uv.lock"
+        return True, "only independent component versions and new changelog entries changed"
+    except (
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        subprocess.CalledProcessError,
+        tarfile.TarError,
+    ) as error:
+        return False, f"unsupported release metadata: {error}"

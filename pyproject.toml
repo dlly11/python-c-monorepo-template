@@ -42,7 +42,7 @@ lint = [
   "ty>=0.0.80",
 ]
 dev = [
-  "monorepo-repo-tools",
+  "monorepo-repo-tools[commit]",
   { include-group = "lint" },
   { include-group = "test" },
 ]
@@ -61,6 +61,12 @@ coverage = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.repo-tools.conventional-commits]
+shared-scopes = ["repo", "ci", "build", "docs", "deps", "release", "repo-tools"]
+
+[tool.commitizen]
+name = "cz_repo_tools"
 
 [tool.ruff.lint]
 select = [

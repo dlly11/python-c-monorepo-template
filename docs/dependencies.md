@@ -4,7 +4,7 @@
 
 | Version source | Meaning |
 | --- | --- |
-| `version.txt` and component metadata | The shared release number of this repository's deliverables |
+| Component `pyproject.toml` / `version.txt` | Each product's own release number |
 | A member's `[project].dependencies` | Compatible runtime dependency ranges advertised to consumers |
 | Root dependency groups and `uv.lock` | Requested development tools and their resolved Python dependency versions |
 | System tool installation | CMake, compilers, clang-tidy, cppcheck, Doxygen, and uv itself |
@@ -48,8 +48,7 @@ incompatible resolution with overrides or manually installing conflicting packag
 
 The private maintenance package is an editable path dependency at `tools/repo_tools`, resolved
 through the same root lockfile. It has no runtime dependencies and is outside workspace membership,
-so `uv build --all-packages` builds only the product distributions. Its version does not follow
-`version.txt`; see the [package guide](../tools/repo_tools/README.md).
+so `uv build --all-packages` builds only the product distributions. Its version is independent; see the [package guide](../tools/repo_tools/README.md).
 
 ## Where to declare dependencies
 
@@ -141,7 +140,7 @@ Keep isolated pre-commit hook revisions aligned when upgrading their correspondi
 not pinned by `uv.lock`; review their own configuration or installation source separately.
 Use the existing [contribution commands](CONTRIBUTING.md) and [testing guide](testing.md).
 
-Dependabot uses an explicit `chore` commit prefix with a dependency scope for uv, GitHub Actions,
+Dependabot uses the explicit `chore(deps)` commit prefix for uv, GitHub Actions,
 and pre-commit updates. Subjects such as `chore(deps): bump dependency` and
 `chore(deps-dev): update tools` satisfy the Conventional Commit policy without relying on inferred
 repository style. Weekly schedules and update groups are configured in `.github/dependabot.yml`.

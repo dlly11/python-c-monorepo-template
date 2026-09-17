@@ -42,14 +42,14 @@ symbols beginning with `acme_`. Keep the component dependency directions describ
 | Python import namespaces | `example_core`, `example_package_a`, `example_package_b`, `example_package_a_cli` | `src` directories, imports, tests, entry points, setuptools package data, Ruff first-party names, coverage sources, autodoc/examples |
 | Component directories | `core`, `package_a`, `package_b`, `package_a_cli` | Both language trees, CMake subdirectories, release extra-files, documentation toctrees |
 | C symbols, macros, and include paths | `example_*`, `EXAMPLE_*`, `example/` | Headers, sources, guards, version-header templates, tests, Doxygen/examples, native install checker |
-| CMake project and package | `monorepo_template`, `MonorepoTemplate`, `example::core` | Root/component CMake, `cmake` config templates and export namespaces, install destinations, downstream consumer, docs |
+| CMake project and package | `monorepo_template`, `ExampleCore`, `example::core` | Root/component CMake, `cmake` config templates and export namespaces, install destinations, downstream consumer, docs |
 | Executable names | `package-a-cli` | Python entry point and installed CLI checks; native target/output name, CTest, examples, artifact checks |
 | Hosting and owners | `dlly11`, repository URL, Pages URL | README/component links, Sphinx base/source URLs, PR-template link, CODEOWNERS, reuse statement's original-repository link |
 
 The private `monorepo-repo-tools` distribution and `repo_tools` import namespace can keep their
 names when adopting the template. Keep them outside workspace membership, release registrations,
 and product coverage sources; retain `repo_tools` in Ruff’s first-party names. Their private
-version is independent of `version.txt`.
+version is independent of all product versions.
 
 The Python and native CLIs currently share a command name. Use an explicit native build/install path
 when testing both, or choose distinct names in the adopted project.
@@ -95,17 +95,19 @@ Update the GitHub repository and Pages URLs, project descriptions, authors, and 
 name. Preserve the original-template link when explaining where the template came from; it should
 not become a claim that you own the original repository.
 
-For a newly created repository with no releases, choose an initial baseline such as `0.1.0` and run:
+The creator seeds every component from `project.version` and removes the upstream template release.
+For manual adoption, register each product path and ID in the Release Please config and manifest,
+remove upstream-only root release metadata, and choose each component's baseline. The setter can
+then update a registered component transactionally:
 
 ```text
-uv run repo-tools set-version 0.1.0
+uv run repo-tools set-version python-core 0.1.0
 uv run repo-tools check-versions
 ```
 
-Set the `"."` value in `tools/release-please/manifest.json` to that same baseline and replace the
-inherited changelog with your project's initial history. The setter deliberately does not change
-Release Please state, create tags, or publish a release. Subsequent releases use the normal
-[release workflow](releases.md); do not reset version history in an already released fork.
+The setter updates its manifest entry, but does not create changelogs, tags, or releases. Replace
+inherited component changelogs with initial history only for a new repository; never reset version
+history in an already released fork. Subsequent releases use the [release workflow](releases.md).
 Configure hosting and required checks using [GitHub setup](github-setup.md) before relying on automation.
 Review `tools/github/repository-policy.json` and run
 `uv run repo-tools check-github-settings --repo OWNER/REPO` after configuring the new

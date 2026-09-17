@@ -25,8 +25,17 @@ def git_repository(
     ("message", "expected"),
     [
         ("fix: handle input\n", 0),
-        ("feat(core)!: change API\n\nDetails.\n\nBREAKING CHANGE: use the new API.\n", 0),
-        ("chore(main): release 1.2.3\r\n\r\nRelease notes.\r\n", 0),
+        (
+            "\n\n".join(
+                [
+                    "feat(python-core)!: change API",
+                    "Details.",
+                    "BREAKING CHANGE: use the new API.\n",
+                ]
+            ),
+            0,
+        ),
+        ("chore: release main\r\n\r\nRelease notes.\r\n", 0),
         ("fix: handle input\n\n# Editor instructions\n", 0),
         ("fixup! fix: handle input\n", 1),
         ("Merge branch 'main'\n", 1),

@@ -1,4 +1,5 @@
 add_executable(example_package_a_cli src/main.c)
+monorepo_component(example_package_a_cli native-package-a-cli ExamplePackageACli)
 target_link_libraries(example_package_a_cli PRIVATE example::package_a)
 monorepo_add_version_header(
   example_package_a_cli
@@ -9,7 +10,9 @@ monorepo_add_version_header(
 set_target_properties(example_package_a_cli PROPERTIES OUTPUT_NAME package-a-cli)
 monorepo_set_project_options(example_package_a_cli)
 
-install(TARGETS example_package_a_cli RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+set_target_properties(example_package_a_cli PROPERTIES EXPORT_NAME package_a_cli)
+monorepo_install_component(example_package_a_cli example_package_a)
+get_target_property(cli_version example_package_a_cli MONOREPO_VERSION)
 
 if(BUILD_TESTING)
   # Optional fifth argument is passed verbatim, including an empty name. The sixth
@@ -37,7 +40,7 @@ if(BUILD_TESTING)
 
   monorepo_add_cli_test(c.package_a_cli 0 "Hello, Ada!\n" "" "Ada")
   monorepo_add_cli_test(
-    c.package_a_cli.version 0 "package-a-cli ${PROJECT_VERSION}\n" "" "--version"
+    c.package_a_cli.version 0 "package-a-cli ${cli_version}\n" "" "--version"
   )
   monorepo_add_cli_test(
     c.package_a_cli.usage 1 "" "usage: $<TARGET_FILE:example_package_a_cli> NAME\n"

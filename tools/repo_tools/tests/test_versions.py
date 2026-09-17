@@ -1,5 +1,6 @@
 """Version validation and transactional update regressions."""
 
+import json
 import subprocess
 from pathlib import Path
 from unittest.mock import Mock
@@ -8,6 +9,7 @@ import pytest
 
 from repo_tools import cli, repository_metadata
 from repo_tools.commands import check_python, check_versions, set_version
+from repo_tools.components import component_errors
 
 
 def snapshot(root: Path) -> dict[Path, bytes]:
@@ -74,15 +76,16 @@ def test_malformed_metadata_is_reported(
     assert "no repository workspace" in capsys.readouterr().err
 
 
-def test_set_version_success(repository: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_set_version_success(independent_repository: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repository = independent_repository
     setter = set_version
-    arguments = ["set-version", "2.0.0"]
+    arguments = ["set-version", "template", "2.0.0"]
     monkeypatch.setattr(setter.shutil, "which", lambda _: "/approved/bin/uv")
 
     def refresh_lock(*args: object, **kwargs: object) -> None:
         lock = repository / "uv.lock"
         lock.write_text(
-            lock.read_text(encoding="utf-8").replace("1.2.3", "2.0.0"), encoding="utf-8"
+            lock.read_text(encoding="utf-8").replace("1.2.3", "2.0.0", 1), encoding="utf-8"
         )
 
     run = Mock(side_effect=refresh_lock)
@@ -90,20 +93,21 @@ def test_set_version_success(repository: Path, monkeypatch: pytest.MonkeyPatch) 
     assert cli.main(arguments, default_root=repository) == 0
     run.assert_called_once_with(["uv", "lock"], cwd=repository, check=True)
     assert check_versions.repository_version(repository) == "2.0.0"
-    assert check_versions.version_errors(repository, "2.0.0") == []
+    assert component_errors(repository) == []
 
 
 @pytest.mark.parametrize("failure", ["lock", "validation", "declaration", "interrupt"])
 def test_failed_update_restores_every_managed_file(
     failure: str,
-    repository: Path,
+    independent_repository: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    repository = independent_repository
     setter = set_version
     if failure == "declaration":
         (repository / "CMakeLists.txt").write_text("project(example)\n", encoding="utf-8")
     before = snapshot(repository)
-    arguments = ["set-version", "2.0.0"]
+    arguments = ["set-version", "template", "2.0.0"]
     monkeypatch.setattr(setter.shutil, "which", lambda _: "/approved/bin/uv")
 
     def fail_lock(*args: object, **kwargs: object) -> None:
@@ -124,11 +128,12 @@ def test_failed_update_restores_every_managed_file(
 @pytest.mark.parametrize("missing_uv", [False, True])
 def test_rejected_update_does_not_write(
     missing_uv: bool,
-    repository: Path,
+    independent_repository: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    repository = independent_repository
     before = snapshot(repository)
-    arguments = ["set-version", "2.0.0" if missing_uv else "invalid"]
+    arguments = ["set-version", "template", "2.0.0" if missing_uv else "invalid"]
     monkeypatch.setattr(set_version.shutil, "which", lambda _: None)
     with pytest.raises(SystemExit) as error:
         cli.main(arguments, default_root=repository)
@@ -137,8 +142,9 @@ def test_rejected_update_does_not_write(
 
 
 def test_new_member_is_discovered_by_version_setter_and_type_checks(
-    repository: Path, monkeypatch: pytest.MonkeyPatch
+    independent_repository: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    repository = independent_repository
     member = repository / "python/packages/added"
     namespace = member / "src/added"
     namespace.mkdir(parents=True)
@@ -153,14 +159,29 @@ def test_new_member_is_discovered_by_version_setter_and_type_checks(
         commands.append(command)
         if command == ["uv", "lock"]:
             lock = repository / "uv.lock"
-            lock.write_text(lock.read_text().replace("1.2.3", "2.0.0"), encoding="utf-8")
+            lock.write_text(lock.read_text().replace("1.2.3", "2.0.0", 1), encoding="utf-8")
 
     monkeypatch.setattr(subprocess, "run", run)
     check_python.check_projects(repository)
     assert ["ty", "check", "--project", str(member)] in commands
-    set_version.update_version(repository, "2.0.0")
-    assert 'version = "2.0.0"' in metadata.read_text()
-    assert repository_metadata.version_errors(repository, "2.0.0") == []
+    with pytest.raises(ValueError, match="ownership"):
+        set_version.update_version(repository, "2.0.0", "template")
+    config_path = repository / "tools/release-please/config.json"
+    config = json.loads(config_path.read_text())
+    config["packages"]["python/packages/added"] = {
+        "component": "python-added",
+        "release-type": "python",
+    }
+    config["packages"]["."]["exclude-paths"].append("python/packages/added")
+    config_path.write_text(json.dumps(config))
+    manifest_path = repository / "tools/release-please/manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["python/packages/added"] = "1.2.3"
+    manifest_path.write_text(json.dumps(manifest))
+    (member / "CHANGELOG.md").write_text("# Changelog\n")
+    set_version.update_version(repository, "2.0.0", "template")
+    assert 'version = "1.2.3"' in metadata.read_text()
+    assert component_errors(repository) == []
 
 
 @pytest.mark.parametrize(
@@ -175,10 +196,11 @@ def test_new_member_is_discovered_by_version_setter_and_type_checks(
     ],
 )
 def test_cmake_version_update_only_changes_project_literal(
-    repository: Path,
+    independent_repository: Path,
     monkeypatch: pytest.MonkeyPatch,
     declaration: str,
 ) -> None:
+    repository = independent_repository
     contents = (
         "cmake_minimum_required(VERSION 3.25.1)\n"
         "# project(ignored VERSION 1.2.3)\n"
@@ -192,15 +214,15 @@ def test_cmake_version_update_only_changes_project_literal(
 
     def refresh(*args: object, **kwargs: object) -> None:
         lock = repository / "uv.lock"
-        lock.write_text(lock.read_text().replace("1.2.3", "2.0.0"), encoding="utf-8")
+        lock.write_text(lock.read_text().replace("1.2.3", "2.0.0", 1), encoding="utf-8")
 
     monkeypatch.setattr(subprocess, "run", refresh)
-    set_version.update_version(repository, "2.0.0")
+    set_version.update_version(repository, "2.0.0", "template")
     assert (
         cmake.read_bytes()
-        == contents.replace(declaration, declaration.replace("1.2.3", "2.0.0")).encode()
+        == contents.replace(declaration, declaration.replace("1.2.3", "2.0.0", 1)).encode()
     )
-    assert metadata.version_errors(repository, "2.0.0") == []
+    assert component_errors(repository) == []
 
 
 @pytest.mark.parametrize(
@@ -226,10 +248,11 @@ def test_cmake_version_update_only_changes_project_literal(
     ],
 )
 def test_invalid_cmake_project_is_rejected_before_any_writes(
-    repository: Path,
+    independent_repository: Path,
     monkeypatch: pytest.MonkeyPatch,
     contents: str,
 ) -> None:
+    repository = independent_repository
     (repository / "CMakeLists.txt").write_text(contents, encoding="utf-8")
     before = snapshot(repository)
     run = Mock()
@@ -237,6 +260,6 @@ def test_invalid_cmake_project_is_rejected_before_any_writes(
     with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
         repository_metadata.cmake_version(repository)
     with pytest.raises(ValueError, match=r"CMakeLists\.txt"):
-        set_version.update_version(repository, "2.0.0")
+        set_version.update_version(repository, "2.0.0", "template")
     assert snapshot(repository) == before
     run.assert_not_called()

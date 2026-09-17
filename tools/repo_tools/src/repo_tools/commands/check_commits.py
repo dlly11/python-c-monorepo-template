@@ -40,17 +40,17 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         if args.message_file is not None:
             return int(
                 not check_message(
-                    args.message_file.read_text(encoding="utf-8"), str(args.message_file)
+                    args.message_file.read_text(encoding="utf-8"), str(args.message_file), root=root
                 )
             )
         commits = commits_between(args.base, args.head, root=root)
         failures = 0
         for commit in commits:
             message = git("show", "--no-patch", "--format=%B", commit, "--", root=root)
-            failures += not check_message(message, commit[:12])
+            failures += not check_message(message, commit[:12], root=root, revision=commit)
         print(f"Checked {len(commits)} commit(s); {failures} invalid subject(s).")
         return int(failures != 0)
-    except (OSError, UnicodeError, subprocess.CalledProcessError) as error:
+    except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as error:
         print(f"cannot validate commits: {error}", file=sys.stderr)
         if isinstance(error, subprocess.CalledProcessError):
             print(error.stderr, file=sys.stderr)

@@ -62,7 +62,7 @@ uv run python -m template_creator wizard
 `template-create` with no arguments starts the same wizard as `template-create wizard`.
 The guide requires a terminal; automation should use the config commands below.
 
-1. Set the display name, repository slug, description, shared prefix, and initial version.
+1. Set the display name, repository slug, description, shared prefix, and initial component version.
 2. Set the GitHub owner and documentation URL.
 3. Provide the author name and public email.
 4. Choose a separate private vulnerability-reporting email or HTTPS URL.
@@ -142,7 +142,7 @@ generation; correct that field in the guide or saved recipe. Addresses are never
 
 The shared prefix `acme_lab` yields `acme-lab-core`, `acme_lab_core`, C symbols beginning
 `acme_lab_`, macros beginning `ACME_LAB_`, `<acme_lab/core.h>`, `acme_lab::core`, and the
-CMake package `AcmeLab`. Both CLIs become `acme-lab-package-a-cli`. Component directories
+CMake packages such as `AcmeLabCore` and `AcmeLabPackageA`. Both CLIs become `acme-lab-package-a-cli`. Component directories
 remain `core`, `package_a`, `package_b`, and `package_a_cli`.
 
 | Name | Example | Meaning |
@@ -152,7 +152,7 @@ remain `core`, `package_a`, `package_b`, and `package_a_cli`.
 | Distribution | `acme-lab-core` | Name used when installing a Python package |
 | Import namespace | `acme_lab_core` | Name used in Python `import` statements |
 | C prefix | `acme_lab_` | Prefix for exported C symbols |
-| CMake package | `AcmeLab` | Name passed to `find_package` |
+| CMake package | `AcmeLabCore` | Name passed to `find_package` |
 
 Changing the slug or owner in the guide updates a documentation URL that still matches the
 previous GitHub Pages default. A custom URL remains unchanged.
@@ -160,7 +160,10 @@ The documentation URL updates links and Sphinx metadata; it does not configure h
 See [GitHub setup](../../../../docs/github-setup.md#documentation-hosting) for default Pages,
 custom Pages domains, and external hosts. HTTPS URLs may use an explicit port from 1 to 65535.
 
-The initial version defaults to `0.1.0`. For this new project, dependency lower bounds between
+The initial version defaults to `0.1.0` and seeds every product. Products then release independently.
+The generated root is a virtual uv workspace: it has no `[project]`, `version.txt`, root changelog,
+or template release. Component IDs also provide the allowed commit scopes; the shared list and
+Commitizen authoring configuration remain in the root pyproject. For this new project, dependency lower bounds between
 workspace members start at that baseline. Private `repo-tools` keeps its independent version.
 Subsequent releases follow the project's normal release workflow.
 

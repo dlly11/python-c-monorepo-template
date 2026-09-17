@@ -1,4 +1,5 @@
 add_library(example_core STATIC src/core.c)
+monorepo_component(example_core native-core ExampleCore)
 add_library(example::core ALIAS example_core)
 
 target_include_directories(
@@ -16,18 +17,7 @@ monorepo_add_version_header(
 set_target_properties(example_core PROPERTIES EXPORT_NAME core)
 monorepo_set_project_options(example_core)
 
-install(
-  TARGETS example_core
-  EXPORT MonorepoTemplateTargets
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
-install(
-  DIRECTORY include/
-  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING
-  PATTERN "*.h"
-)
+monorepo_install_component(example_core)
 
 if(BUILD_TESTING)
   add_library(example_core_c_test_helpers OBJECT tests/unknown_status.c)
@@ -37,7 +27,7 @@ if(BUILD_TESTING)
   add_executable(example_core_tests tests/test_core.cpp)
   target_link_libraries(example_core_tests PRIVATE example::core example_cpputest_main example_core_c_test_helpers)
   monorepo_set_cpp_test_options(example_core_tests)
-  monorepo_set_version_test_definitions(example_core_tests)
+  monorepo_set_version_test_definitions(example_core_tests example_core)
   add_test(NAME c.core COMMAND example_core_tests)
   set_tests_properties(c.core PROPERTIES TIMEOUT 60)
 endif()

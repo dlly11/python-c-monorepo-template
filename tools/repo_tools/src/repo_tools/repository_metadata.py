@@ -102,7 +102,11 @@ def python_projects(root: Path) -> dict[Path, str]:
     """Discover every version-bearing Python project, rejecting ambiguous workspaces."""
     config = read_project(root / "pyproject.toml")
     members, errors = discover_members(root, config)
-    projects = {Path("pyproject.toml"): normalized_name(config["project"]["name"])}
+    projects = (
+        {Path("pyproject.toml"): normalized_name(config["project"]["name"])}
+        if "project" in config
+        else {}
+    )
     projects.update({member.path / "pyproject.toml": member.name for member in members})
     names = list(projects.values())
     namespaces = [namespace for member in members for namespace in member.namespaces]

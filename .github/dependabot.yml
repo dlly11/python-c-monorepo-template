@@ -3,8 +3,7 @@ updates:
   - package-ecosystem: uv
     directory: /
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: "chore(deps)"
     schedule:
       interval: weekly
     groups:
@@ -14,8 +13,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: "chore(deps)"
     schedule:
       interval: weekly
     groups:
@@ -25,7 +23,6 @@ updates:
   - package-ecosystem: pre-commit
     directory: /
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: "chore(deps)"
     schedule:
       interval: weekly

@@ -58,7 +58,11 @@ def eligible_pr(
     if "autorelease: pending" not in {label["name"] for label in pr["labels"]}:
         raise ValueError("release PR must have Release Please's pending label")
     title = pr["title"]
-    if not valid_subject(title) or not title.startswith("chore(main): release "):
+    combined = expected == "release-please--branches--main"
+    valid_title = (
+        title == "chore: release main" if combined else title.startswith("chore(main): release ")
+    )
+    if not valid_subject(title) or not valid_title:
         raise ValueError("release PR title must be a conventional main release title")
     return title
 
