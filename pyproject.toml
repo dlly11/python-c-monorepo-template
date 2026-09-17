@@ -32,7 +32,7 @@ test = [
   "pytest-cov>=6.2",
 ]
 lint = [
-  "clang-format==21.1.8",
+  "clang-format==23.1.1",
   # BEGIN TEMPLATE CREATOR ONLY
   # Type-check the creator's custom backend outside its isolated build environment.
   "setuptools>=77",
