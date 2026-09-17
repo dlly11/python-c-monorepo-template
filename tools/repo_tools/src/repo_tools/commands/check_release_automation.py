@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from repo_tools.conventional_commits import valid_subject
-from repo_tools.github_api import api, repository_name
+from repo_tools.github_api import api, items, repository_name
 from repo_tools.release_changes import CONFIG, branch_at, release_branch
 
 
@@ -68,14 +68,24 @@ def eligible_pr(
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--pr", type=int, help="validate the PR returned by Release Please")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--pr", type=int, help="validate the PR returned by Release Please")
+    mode.add_argument(
+        "--check-pending", action="store_true", help="fail if merged release PRs remain unpublished"
+    )
     parser.add_argument("--branch")
     parser.add_argument("--expected-head")
 
 
 def execute(args: argparse.Namespace, *, root: Path) -> int:
     try:
-        if args.pr is None:
+        if args.check_pending:
+            if args.branch is not None or args.expected_head is not None:
+                raise ValueError("--branch and --expected-head require --pr")
+            repository = repository_name(os.environ.get("GITHUB_REPOSITORY"), root=root)
+            require_no_pending_releases(repository)
+            return 0
+        elif args.pr is None:
             if args.branch is not None or args.expected_head is not None:
                 raise ValueError("--branch and --expected-head require --pr")
             mode, automatic = configuration(os.environ)
@@ -98,3 +108,32 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
         print(f"release automation validation failed: {error}", file=sys.stderr)
         return 1
     return 0
+
+
+def require_no_pending_releases(repository: str) -> None:
+    """Expose Release Please's merged-but-untagged blocker without modifying PRs or labels."""
+    pending = []
+    for issue in items(
+        f"repos/{repository}/issues?state=closed&labels=autorelease%3A%20pending&per_page=100"
+    ):
+        if "pull_request" not in issue:
+            continue
+        pr = api(f"repos/{repository}/pulls/{issue['number']}")
+        if (
+            pr.get("merged_at")
+            and pr["base"]["ref"] == "main"
+            and "autorelease: pending" in {label["name"] for label in pr["labels"]}
+        ):
+            pending.append(f"https://github.com/{repository}/pull/{pr['number']}")
+    if pending:
+        message = (
+            "Merged release PRs remain unpublished: " + ", ".join(pending) + ". "
+            "Release Please will not prepare another PR until these releases are created. "
+            "Inspect the Create GitHub release logs; fix publication and retry Release on main. "
+            "Do not remove the pending label to bypass publication."
+        )
+        if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
+            with Path(summary).open("a", encoding="utf-8") as stream:
+                stream.write("## Release preparation blocked\n\n" + message + "\n")
+        raise ValueError(message)
+    print("No merged release PRs are awaiting publication.")

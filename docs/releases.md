@@ -15,6 +15,10 @@ The upstream template and repository creator remain one release unit, `template`
 that number. Generated repositories omit this release unit, root version/changelog, and root
 `[project]`; they retain the shared uv workspace and development configuration.
 
+The root Release Please entry must keep both `component` and `package-name` empty. This lets
+Release Please publish a template-only PR from the shared release branch with an unprefixed tag.
+Repository commands and commit scopes still call this release unit `template`.
+
 The migration preserves the existing `v2.0.4` release. Product baselines begin at `2.0.4`, with
 bootstrap history starting at its release commit. Existing tags are never rewritten.
 <!-- END TEMPLATE CREATOR ONLY -->
@@ -33,8 +37,17 @@ with the available release or PR link. A created release does not mean all asset
 | Checks on an open release PR | Follow [release PR approval and retry guidance](github-setup.md#approving-and-retrying-release-pr-checks); retry authoritative validation before its delegating check. |
 | **Create GitHub release**, before a release exists | Fix the reported cause and follow the [manual release retry](#automated-release-sequence). If CI evidence expired, use the recovery row below. |
 | **Prepare release PR** | Fix the reported cause and retry that failed job. Successful asset jobs need no retry; see [release job recovery](#recovering-missing-release-assets). |
+| Merged release PR remains `autorelease: pending` | Follow [unpublished release recovery](#recovering-an-unpublished-merged-release). Release Please cannot prepare the next PR until publication succeeds. |
 | Merged PR evidence expired or is missing | Run fresh full CI on current main and explicitly select it using [evidence recovery](#recovering-expired-ci-evidence). |
 | A release exists but assets are missing | Retry the original failed asset job; use [asset recovery](#recovering-missing-release-assets) if the original run is unavailable. A new Release dispatch does not restore assets. |
+
+## Recovering an unpublished merged release
+
+Release Please can return success without creating a release or PR when a merged release PR
+is still unpublished. The **Prepare release PR** job checks for this condition and fails with
+links to the blocking PRs. Inspect the **Create GitHub release** logs, correct the publication
+cause, and run Release on current `main` after the correction is merged. Keep the pending
+label and release PR body intact; removing them bypasses publication instead of repairing it.
 
 ## Sources of version metadata
 

@@ -3,7 +3,7 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "package-name": "python-c-monorepo-template",
+      "package-name": "",
       "include-v-in-tag": true,
       "include-component-in-tag": false,
       "extra-files": [
@@ -22,7 +22,7 @@
           "path": "CMakeLists.txt"
         }
       ],
-      "component": "template",
+      "component": "",
       "exclude-paths": [
         "python/packages/core",
         "python/packages/package_a",

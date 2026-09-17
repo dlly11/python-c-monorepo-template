@@ -76,7 +76,8 @@ Package-level modules contain shared helpers. Update the relevant workflow guide
 user-facing operation; CLI help remains the reference for command options.
 
 `check-release-automation` is the workflow's read-only validator for explicit release credentials
-and the managed PR/head eligible for auto-merge. It never merges a PR or changes GitHub settings;
+and the managed PR/head eligible for auto-merge. Its `--check-pending` mode detects unpublished
+merged release PRs that block further preparation. It never merges a PR or changes GitHub settings;
 the release workflow owns those writes. See the release guide for configuration and activation.
 
 `check-ci-context` selects the workflow role and validation profile. Its local `--classify --base

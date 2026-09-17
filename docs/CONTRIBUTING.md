@@ -89,7 +89,8 @@ checking the live title. Ordinary PR events also validate fork PRs using their a
 The subject format is `type(scope)!: description`; scope and `!` are optional. Allowed types are
 `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and `test`.
 Scopes, when supplied, must match a component ID or a shared scope. Component scopes come from
-Release Please's configuration; shared scopes are declared once in
+Release Please's configuration, with `template` as the local name for the upstream root release
+when present; shared scopes are declared once in
 `[tool.repo-tools.conventional-commits].shared-scopes` in the root `pyproject.toml`.
 Use `uv run repo-tools list-scopes` to see the current names and component paths. For example,
 `fix(python-core): handle empty input` and `chore(deps): update tools` are valid. Omit a scope for

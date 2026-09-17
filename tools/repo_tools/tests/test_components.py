@@ -265,3 +265,17 @@ def test_publish_routes_only_released_python_product(independent_repository, mon
     with pytest.raises(ValueError, match="tag moved"):
         release_assets.publish(root, [release], "python")
     assert len(builds) == 1
+
+
+@pytest.mark.parametrize("name", ["", "template"])
+def test_root_retains_local_scope_and_tag(independent_repository: Path, name: str) -> None:
+    config_path = independent_repository / CONFIG
+    config = json.loads(config_path.read_text())
+    config["packages"]["."].update({"component": name, "package-name": ""})
+    config_path.write_text(json.dumps(config))
+    root = next(c for c in load_components(independent_repository) if c.path == ".")
+    assert root.id == "template"
+    assert root.tag("1.2.3") == "v1.2.3"
+    policy = scope_policy(independent_repository)
+    assert policy is not None and policy["template"] == "."
+    assert component_errors(independent_repository) == []

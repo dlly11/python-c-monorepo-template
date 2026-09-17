@@ -54,7 +54,8 @@ def independent_repository(repository: Path) -> Path:
         "group-pull-request-title-pattern": "chore: release ${branch}",
         "packages": {
             ".": {
-                "component": "template",
+                "component": "",
+                "package-name": "",
                 "release-type": "simple",
                 "include-component-in-tag": False,
                 "exclude-paths": ["python/packages/core"],
