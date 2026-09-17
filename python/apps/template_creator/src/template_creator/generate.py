@@ -36,8 +36,8 @@ def host_libraries() -> Iterator[None]:
         kernel.SetDllDirectoryW(getattr(sys, "_MEIPASS", None))
 
 
-def run(command: list[str], root: Path, *, timeout: int = 300) -> None:
-    """Use argument arrays and expose useful errors without a shell."""
+def host_environment() -> dict[str, str]:
+    """Prepare external tools' environment without changing the creator process."""
     environment = dict(os.environ)
     # Project/directory overrides take precedence over cwd in uv. Never let the
     # caller redirect generation into another repository; keep cache/network settings.
@@ -58,11 +58,16 @@ def run(command: list[str], root: Path, *, timeout: int = 300) -> None:
             environment.pop("LD_LIBRARY_PATH", None)
         else:
             environment["LD_LIBRARY_PATH"] = original
+    return environment
+
+
+def run(command: list[str], root: Path, *, timeout: int = 300) -> None:
+    """Use argument arrays and expose useful errors without a shell."""
     with host_libraries():
         result = subprocess.run(
             command,
             cwd=root,
-            env=environment,
+            env=host_environment(),
             text=True,
             capture_output=True,
             timeout=timeout,
@@ -80,7 +85,12 @@ def require_uv() -> str:
         )
     with host_libraries():
         result = subprocess.run(
-            [uv, "--version"], capture_output=True, text=True, timeout=10, check=True
+            [uv, "--version"],
+            env=host_environment(),
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
         )
     match = re.match(r"uv (\d+)\.(\d+)\.(\d+)", result.stdout)
     if match is None or tuple(map(int, match.groups())) < (0, 10, 9):
