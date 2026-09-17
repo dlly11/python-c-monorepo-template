@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.4](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.3...v2.0.4) (2026-09-17)
+
+
+### Bug Fixes
+
+* handle legacy console encodings and explain CI failures ([c4bbe52](https://github.com/dlly11/python-c-monorepo-template/commit/c4bbe5201f5aaee0caa9b2d00cef6227ae6b950d))
+* harden creator inputs and unify native formatting ([ef13491](https://github.com/dlly11/python-c-monorepo-template/commit/ef134911ee8098567c59ad903cb5e070d2440754))
+
 ## [2.0.3](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.2...v2.0.3) (2026-09-17)
 
 
