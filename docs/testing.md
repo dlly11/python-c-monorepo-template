@@ -115,6 +115,11 @@ and never executes downloaded content. GitHub's repository artifact retention ap
 [CI evidence recovery](releases.md#recovering-expired-ci-evidence) for retry limits, rerunning
 original validation, and authorizing recovery from fresh CI on current main.
 
+The **CI context** and **CI result** job summaries show the selected role/profile, selection reason,
+and base/head commits. Delegates initially show that authoritative validation is pending; after
+verification, their result summary reports the actual profile and links to the authoritative run
+and attempt. Failures remain failures even if the informational summary cannot be written.
+
 The post-merge job needs contents, actions, and pull-request read permissions.
 
 ## Python distribution checks

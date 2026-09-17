@@ -330,3 +330,17 @@ def test_new_run_during_download_invalidates_selected_evidence(
     monkeypatch.setattr(module, "validation_record", download)
     with pytest.raises(ValueError, match="newer PR CI run"):
         module.verify_commit(REPOSITORY, state["merge"], 42)
+
+
+def test_missing_merged_evidence_explains_current_recovery(merge_context, monkeypatch, capsys):
+    module, state = merge_context
+
+    def missing(*args):
+        raise ValueError("validation artifact unavailable")
+
+    monkeypatch.setattr(module, "validation_record", missing)
+    assert cli.main(state["arguments"]) == 1
+    message = capsys.readouterr().err
+    assert "current main" in message and "recovery-run-id" in message
+    assert "Historical schema-1" in message
+    assert "retry PR CI within 30 days" not in message

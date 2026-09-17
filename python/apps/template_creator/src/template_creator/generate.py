@@ -83,15 +83,31 @@ def require_uv() -> str:
         raise ValueError(
             "uv is required to generate the lockfile; install it using https://docs.astral.sh/uv/getting-started/installation/"
         )
-    with host_libraries():
-        result = subprocess.run(
-            [uv, "--version"],
-            env=host_environment(),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=True,
+    try:
+        with host_libraries():
+            result = subprocess.run(
+                [uv, "--version"],
+                env=host_environment(),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=True,
+            )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        reason = (
+            f"exited with status {error.returncode}"
+            if isinstance(error, subprocess.CalledProcessError)
+            else "timed out after 10 seconds"
         )
+        output = [
+            value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+            for value in (error.stdout, error.stderr)
+            if value
+        ]
+        detail = "\n" + "\n".join(output) if output else ""
+        raise ValueError(f"uv version check at {uv} {reason}{detail}") from error
+    except OSError as error:
+        raise ValueError(f"cannot run uv version check at {uv}: {error}") from error
     match = re.match(r"uv (\d+)\.(\d+)\.(\d+)", result.stdout)
     if match is None or tuple(map(int, match.groups())) < (0, 10, 9):
         raise ValueError("uv >=0.10.9 is required")

@@ -65,8 +65,9 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
     ) as error:
         print(f"merge verification failed: {error}", file=sys.stderr)
         print(
-            "For missing evidence, retry PR CI within 30 days of its initial run. Otherwise, "
-            "run fresh CI on main and use Release recovery-run-id; see docs/testing.md.",
+            "For missing evidence after merging, run fresh full CI on current main and use "
+            "Release recovery-run-id. Historical schema-1 retries are described in "
+            "docs/releases.md#recovering-expired-ci-evidence.",
             file=sys.stderr,
         )
         return 1

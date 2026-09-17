@@ -14,6 +14,12 @@ from repo_tools import github_checks
 from repo_tools.commands import check_merge, check_release_readiness
 
 
+@pytest.fixture(autouse=True)
+def isolated_ci_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep simulated CI outcomes out of the test runner's real job summary."""
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+
+
 @pytest.fixture
 def repository(
     tmp_path: Path,
