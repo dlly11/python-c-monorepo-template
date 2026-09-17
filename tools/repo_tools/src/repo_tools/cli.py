@@ -9,6 +9,8 @@ from repo_tools.context import resolve_root
 
 COMMANDS = (
     "build-docs",
+    "check-ci-context",
+    "check-ci-result",
     "check-commits",
     "check-coverage",
     "check-github-settings",

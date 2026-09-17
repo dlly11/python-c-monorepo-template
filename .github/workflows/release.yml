@@ -127,14 +127,15 @@ jobs:
           fi
           echo "sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
-      - name: Run CI for the release pull request
-        if: steps.release.outputs.prs_created == 'true' && steps.automation.outputs.auth-mode == 'github-token'
+      - name: Dispatch authoritative release PR validation
+        if: steps.release.outputs.prs_created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_BRANCH: ${{ steps.release-pr.outputs.branch }}
           RELEASE_PR_NUMBER: ${{ steps.release-pr.outputs.number }}
+          RELEASE_HEAD: ${{ steps.release-head.outputs.sha }}
         run: |
-          gh workflow run ci.yml --ref "${RELEASE_BRANCH}"
+          gh workflow run ci.yml --ref "${RELEASE_BRANCH}" -f "release-pr-number=${RELEASE_PR_NUMBER}" -f "expected-head=${RELEASE_HEAD}"
           gh workflow run pr-title.yml --ref "${RELEASE_BRANCH}" -f "pr-number=${RELEASE_PR_NUMBER}"
 
       - name: Validate the synchronized release PR for auto-merge

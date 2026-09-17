@@ -10,7 +10,9 @@
     "squash_merge_commit_message": "COMMIT_MESSAGES"
   },
   "protection": {
-    "enforce_admins": {"enabled": true},
+    "enforce_admins": {
+      "enabled": true
+    },
     "required_pull_request_reviews": {
       "required_approving_review_count": 0,
       "require_code_owner_reviews": false,
@@ -19,27 +21,47 @@
     "required_status_checks": {
       "strict": true,
       "checks": [
-        {"context": "Python quality", "app_id": 15368},
-        {"context": "Conventional PR title", "app_id": 15368},
-        {"context": "Python 3.13", "app_id": 15368},
-        {"context": "Python 3.14", "app_id": 15368},
-        {"context": "Coverage", "app_id": 15368},
-        {"context": "Documentation", "app_id": 15368},
-        {"context": "Native build (ubuntu-latest)", "app_id": 15368},
-        {"context": "Native build (macos-latest)", "app_id": 15368},
-        {"context": "Native build (windows-latest)", "app_id": 15368},
-        {"context": "Native static analysis", "app_id": 15368},
-        {"context": "Native sanitizers", "app_id": 15368},
-        {"context": "Repository creator (linux-x64)", "app_id": 15368},
-        {"context": "Repository creator (linux-arm64)", "app_id": 15368},
-        {"context": "Repository creator (windows-x64)", "app_id": 15368},
-        {"context": "Repository creator (windows-arm64)", "app_id": 15368},
-        {"context": "Repository creator (macos-x64)", "app_id": 15368},
-        {"context": "Repository creator (macos-arm64)", "app_id": 15368}
+        {
+          "context": "CI result",
+          "app_id": 15368
+        },
+        {
+          "context": "Conventional PR title",
+          "app_id": 15368
+        }
       ]
     },
-    "required_linear_history": {"enabled": false},
-    "allow_force_pushes": {"enabled": false},
-    "allow_deletions": {"enabled": false}
+    "required_linear_history": {
+      "enabled": false
+    },
+    "allow_force_pushes": {
+      "enabled": false
+    },
+    "allow_deletions": {
+      "enabled": false
+    }
+  },
+  "validation": {
+    "full": [
+      "Python quality",
+      "Python 3.13",
+      "Python 3.14",
+      "Coverage",
+      "Documentation",
+      "Native build (ubuntu-latest)",
+      "Native build (macos-latest)",
+      "Native build (windows-latest)",
+      "Native static analysis",
+      "Native sanitizers",
+      "Repository creator (linux-x64)",
+      "Repository creator (linux-arm64)",
+      "Repository creator (windows-x64)",
+      "Repository creator (windows-arm64)",
+      "Repository creator (macos-x64)",
+      "Repository creator (macos-arm64)"
+    ],
+    "release": [
+      "Release validation"
+    ]
   }
 }

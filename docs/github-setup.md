@@ -26,14 +26,11 @@ repository created from this template before relying on enforcement or unattende
 
 1. Under **Settings > Actions > General**, allow GitHub Actions to create pull requests.
 2. Protect `main`, require pull requests and passing CI checks, and apply the rules to
-   administrators. Require **Python quality** (which validates commit subjects) and
-   **Conventional PR title**, along with the Python test matrix, coverage, documentation, native
-   build matrix, static analysis, and sanitizer checks. Select GitHub Actions as their expected
-   source. Keep branches up to date before merging and disallow force pushes and branch deletion.
-   Zero required approvals supports a solo maintainer while still requiring a PR and its checks;
-   teams can add review requirements. Do not require the owner to approve their own PR.
-   `Coverage` includes the Python 3.12 tests; only Python 3.13 and 3.14 need separate required
-   compatibility checks.
+   administrators. Require **CI result** and **Conventional PR title**, with GitHub Actions as
+   their expected source. CI result requires every job in the selected validation profile to
+   actually succeed. Keep branches up to date before merging and disallow force pushes and branch
+   deletion. Zero required approvals supports a solo maintainer; teams can add review requirements.
+   Do not require individual quality jobs: release-only PRs intentionally skip the full suite.
    **Merged PR verification** runs after merging and must not be a required PR check.
 3. Under **Settings > General > Pull Requests**, enable **Allow squash merging**, **Allow merge
    commits**, and **Allow rebase merging**. Use the **pull request title** for squash and merge title
@@ -47,19 +44,23 @@ repository created from this template before relying on enforcement or unattende
    a PR before selecting their required check names. The title check belongs to `pr-title.yml`;
    renaming jobs later requires updating the protection settings.
 
-When upgrading an existing repository, merge the verifier update using an already supported method
-first. Then enable the additional methods and configure their defaults as above. Run the
-[settings audit](#audit-the-managed-github-settings) to confirm the transition. For a controlled
-first-use test, the update PR itself can use a newly enabled method once all its required checks
-pass: post-merge CI checks out the updated verifier from that PR. Merge this update before using
-the new method on other PRs; the older verifier would reject them.
+### Migrating existing required checks
+
+First open an ordinary PR containing this workflow update and let the full suite, **CI result**,
+and **Conventional PR title** pass. Keep existing branch protection until this has succeeded.
+Then replace the individual required quality checks with CI result and Conventional PR title,
+keeping strict branch updates, the GitHub Actions source, and administrator enforcement.
+Merge the update and run the [settings audit](#audit-the-managed-github-settings). Confirm a release
+PR uses one authoritative suite and that its merge passes **Merged PR verification** before
+relying on unattended releases. Repository settings are external; changing the policy file does
+not apply them. Recovery CI on main always runs the full suite.
 
 By default, the workflow uses its short-lived `GITHUB_TOKEN` with explicit permissions.
 Token-created or updated PRs produce approval-required workflow runs; other token-generated
 events, including pushes, do not start workflows. Explicit `workflow_dispatch` calls do start
 workflows, so Release dispatches CI and title validation after synchronizing its branch.
-Approving the additional automatic PR runs can duplicate that work. Inspect the dispatched runs
-before approving another copy. See [GitHub's token event behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
+The dispatched run is authoritative. If an additional automatic PR run is approved, it verifies
+that dispatch instead of repeating the quality suite; approval is unnecessary for the dispatch. See [GitHub's token event behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 The title workflow uses only read access to contents and pull requests. No additional credential
 is required for this default mode. Manual dispatch requires the workflow on the default branch.
 
@@ -87,9 +88,10 @@ account allowed to perform the required operations. Follow enterprise approval a
 rotate or renew it before expiry. Never put either credential in a creation recipe.
 
 App/PAT mode uses the selected identity for Release Please, lockfile pushes, and auto-merge requests.
-PR events start CI and title checks without the default token's approval requirement. Release does
-not also dispatch them. A subsequent lockfile commit supersedes the initial PR run; ordinary CI
-concurrency cancels outdated work. Artifact jobs continue to use their own `GITHUB_TOKEN`.
+PR events start without the default token's approval requirement, but their CI delegates to the
+authoritative dispatch sent after lockfile synchronization. A later lockfile commit supersedes
+the initial head. Dispatch and PR concurrency are separate. Title checks remain independent.
+Artifact jobs continue to use their own `GITHUB_TOKEN`.
 
 Before setting `RELEASE_AUTO_MERGE=true`:
 
@@ -97,12 +99,17 @@ Before setting `RELEASE_AUTO_MERGE=true`:
    an identity automatically; invalid selected configuration fails before release writes.
 2. Enable **Allow auto-merge** in repository settings and ensure squash merging is enabled.
 3. Confirm all intended required checks, strict branch updates, and administrator enforcement.
-   Run the settings audit below; include the creator checks in this upstream repository.
+   Run the settings audit below; CI result enforces the full or release profile.
 4. Keep review requirements appropriate for your team. Auto-merge waits for them; it does not
    approve PRs, bypass protection, or remove deployment approvals.
 
-Only the open, same-repository Release Please PR targeting `main`, on its default managed branch
-`release-please--branches--main`, with the pending-release label and synchronized head is eligible.
+Only the open, same-repository Release Please PR targeting `main`, on the branch derived from
+`tools/release-please/config.json`, with the pending-release label and synchronized head is eligible.
+For a configured component/package name this is
+`release-please--branches--main--components--NAME`; without one it is
+`release-please--branches--main`. A renamed generated project uses its own configured name.
+The automation supports the template's single-root simple strategy; custom/multi-package layouts
+need an explicit automation adaptation before enabling auto-merge.
 GitHub performs a squash merge using its conventional release title. Major releases are included;
 ordinary PRs are unaffected. A head change between validation and the merge request rejects that
 request. The resulting main push must still pass merged-PR verification before publishing assets.

@@ -166,6 +166,11 @@ def render(snapshot: Snapshot, config: Config) -> dict[str, bytes]:
             policy["protection"]["required_status_checks"]["checks"] = [
                 check for check in checks if not check["context"].startswith("Repository creator (")
             ]
+            policy["validation"]["full"] = [
+                name
+                for name in policy["validation"]["full"]
+                if not name.startswith("Repository creator (")
+            ]
             content = json.dumps(policy, indent=2) + "\n"
         if name == "CMakeLists.txt":
             content, count = re.subn(

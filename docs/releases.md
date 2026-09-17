@@ -98,14 +98,15 @@ The release workflow runs after successful **post-merge verification on the curr
 
 1. The release gate verifies the triggering repository, CI workflow, event, branch, and commit,
    then checks the latest push CI run for that commit. Its `Merged PR verification` job must pass:
-   merged files must match the tested PR's recorded tree, every required PR CI job must have
+   merged files must match the tested PR's recorded tree, every job in the validated CI profile must have
    succeeded, and final subjects/version metadata must be valid. The full quality suite is not
    repeated after merging. Only then may Release Please open or update a release PR.
 2. The pull request updates `version.txt`, `CHANGELOG.md`, the root and product Python project
    versions, the CMake version, and the Release Please manifest.
 3. The workflow checks out the managed branch, regenerates `uv.lock`, and commits it when changed.
-   With the default token it explicitly dispatches both `ci.yml` and `pr-title.yml` for the resulting
-   release commit. With an approved App or PAT, ordinary PR events run those checks instead.
+   In every credential mode it dispatches `ci.yml` with the PR number and exact resulting head,
+   plus `pr-title.yml`. Automatic PR CI delegates to that run. Metadata-only releases use the
+   [release validation profile](testing.md#release-only-validation); other changes use full CI.
 4. A maintainer merges the release pull request, or optional auto-merge completes it after all
    required checks and reviews pass. Auto-merge supports every release version, including majors.
 5. After the release PR is merged and post-merge verification succeeds, Release Please creates the `vX.Y.Z` tag and
@@ -140,7 +141,8 @@ and choosing an artifact registry.
 ## Recovering expired CI evidence
 
 If the original PR validation artifact is missing, first retry the original PR CI, including
-Python quality, then retry push CI. GitHub permits reruns only within
+CI result (Python quality for historical schema-1 runs), then retry push CI.
+For a managed release PR, rerun its authoritative dispatched CI, not the delegating PR run. GitHub permits reruns only within
 [30 days of the initial execution](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
 A partial rerun can reuse the quality job's record from the same run and immutable head.
 
@@ -270,8 +272,8 @@ the same build command as PR CI without repeating the full quality or generated-
 All Actions remain pinned by SHA. The downloads are unsigned (macOS uses ad-hoc signing only).
 No signing account, certificate, or notarization secret is required.
 
-When adopting this feature upstream, add all six **Repository creator (PLATFORM-ARCH)** checks
-from the repository policy to GitHub branch protection. The generated template excludes them.
+The full CI profile includes all six **Repository creator (PLATFORM-ARCH)** jobs behind the
+required **CI result** gate. Generated repositories exclude those jobs from the profile.
 
 For a failed creator upload, rerun the failed asset job in the original release run. If that run
 is no longer available, check out the exact release tag on the matching platform, install the

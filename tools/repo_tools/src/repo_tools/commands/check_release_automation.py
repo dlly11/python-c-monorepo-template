@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Mapping
@@ -10,6 +11,7 @@ from pathlib import Path
 
 from repo_tools.conventional_commits import valid_subject
 from repo_tools.github_api import api, repository_name
+from repo_tools.release_changes import CONFIG, branch_at, release_branch
 
 
 def configuration(environment: Mapping[str, str]) -> tuple[str, bool]:
@@ -34,9 +36,16 @@ def configuration(environment: Mapping[str, str]) -> tuple[str, bool]:
     return mode, automatic
 
 
-def eligible_pr(repository: str, number: int, branch: str, head: str) -> str:
+def eligible_pr(
+    repository: str, number: int, branch: str, head: str, *, root: Path, revision: str | None = None
+) -> str:
     """Bind auto-merge to Release Please's managed branch and synchronized commit."""
-    if number < 1 or branch != "release-please--branches--main" or not head:
+    expected = (
+        branch_at(root, revision)
+        if revision
+        else release_branch(json.loads((root / CONFIG).read_text()))
+    )
+    if number < 1 or branch != expected or not head:
         raise ValueError("expected a positive release PR number, managed main branch, and head SHA")
     pr = api(f"repos/{repository}/pulls/{number}")
     if pr["state"] != "open" or pr["draft"]:
@@ -74,7 +83,7 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
             print(f"Release authentication: {mode}; auto-merge: {automatic}")
         else:
             repository = repository_name(os.environ.get("GITHUB_REPOSITORY"), root=root)
-            title = eligible_pr(repository, args.pr, args.branch, args.expected_head)
+            title = eligible_pr(repository, args.pr, args.branch, args.expected_head, root=root)
             outputs = {"title": title}
             print(f"Release PR #{args.pr} is eligible at {args.expected_head}.")
         if output := os.environ.get("GITHUB_OUTPUT"):

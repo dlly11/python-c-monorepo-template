@@ -88,6 +88,11 @@ def merge_context(
     module = github_checks
     cli = check_merge
     policy = module.load_policy(root=Path.cwd())
+    # Historical schema-1 evidence must be checked against the policy it tested.
+    full = policy.pop("validation")["full"]
+    policy["protection"]["required_status_checks"]["checks"] = [
+        {"context": name, "app_id": 15368} for name in [*full, "Conventional PR title"]
+    ]
     policy_file = tmp_path / module.POLICY
     policy_file.parent.mkdir(parents=True)
     policy_file.write_text(json.dumps(policy), encoding="utf-8")
@@ -103,7 +108,7 @@ def merge_context(
     git("config", "user.email", "merge@example.invalid")
     source = tmp_path / "source.txt"
     source.write_text("before\n", encoding="utf-8")
-    git("add", "source.txt")
+    git("add", "source.txt", str(module.POLICY))
     git("commit", "-m", "chore: initialize")
     base = git("rev-parse", "HEAD")
     source.write_text("after\n", encoding="utf-8")

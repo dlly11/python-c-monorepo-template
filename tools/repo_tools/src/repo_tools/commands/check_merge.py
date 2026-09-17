@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from repo_tools.github_api import api, repository_name
-from repo_tools.github_checks import record, required_ci_jobs, verify_commit
+from repo_tools.github_checks import record, verify_commit
 from repo_tools.repository_metadata import git
 
 
@@ -47,10 +47,9 @@ def execute(args: argparse.Namespace, *, root: Path) -> int:
         ).splitlines()
         if not commits:
             raise ValueError("push verification requires at least one new main commit")
-        required = required_ci_jobs(root=root)
         workflow_id = api(f"repos/{repository}/actions/workflows/ci.yml")["id"]
         while commits:
-            integration = verify_commit(repository, commits[-1], required, workflow_id, root=root)
+            integration = verify_commit(repository, commits[-1], workflow_id, root=root)
             if not integration or commits[-len(integration) :] != integration:
                 raise ValueError(
                     "push boundary splits a PR integration or its commits are not contiguous"
