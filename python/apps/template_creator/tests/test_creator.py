@@ -672,3 +672,50 @@ def test_windows_external_dll_search(monkeypatch: pytest.MonkeyPatch) -> None:
     kernel.SetDllDirectoryW.return_value = 0
     with pytest.raises(OSError, match="DLL search"), generate.host_libraries():
         pass
+
+
+@pytest.mark.parametrize("failure", ["exit", "timeout", "timeout-empty", "launch"])
+def test_uv_probe_cli_preserves_diagnostics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    config: Config,
+    capsys: pytest.CaptureFixture[str],
+    failure: str,
+) -> None:
+    recipe = tmp_path / "recipe.toml"
+    save(config, recipe)
+    executable = str(tmp_path / "host tools" / "uv")
+    monkeypatch.setattr(generate.shutil, "which", lambda _: executable)
+    error: Exception
+    if failure == "exit":
+        error = subprocess.CalledProcessError(
+            7, [executable, "--version"], output="probe output", stderr="loader diagnostic"
+        )
+    elif failure == "timeout":
+        error = subprocess.TimeoutExpired(
+            [executable, "--version"],
+            10,
+            output=b"partial output\xff",
+            stderr=b"timeout diagnostic",
+        )
+    elif failure == "timeout-empty":
+        error = subprocess.TimeoutExpired([executable, "--version"], 10)
+    else:
+        error = OSError("executable disappeared")
+    monkeypatch.setattr(generate.subprocess, "run", Mock(side_effect=error))
+    destination = tmp_path / "project"
+    assert cli.main(["generate", "--config", str(recipe), "--output", str(destination)]) == 1
+    message = capsys.readouterr().err
+    assert executable in message
+    if failure == "exit":
+        assert (
+            "status 7" in message and "probe output" in message and "loader diagnostic" in message
+        )
+    elif failure.startswith("timeout"):
+        assert "timed out after 10 seconds" in message
+        if failure == "timeout":
+            assert "partial output" in message and "timeout diagnostic" in message
+    else:
+        assert "executable disappeared" in message
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".template-create-*"))

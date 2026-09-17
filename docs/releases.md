@@ -140,15 +140,23 @@ and choosing an artifact registry.
 
 ## Recovering expired CI evidence
 
-If the original PR validation artifact is missing, first retry the original PR CI, including
-CI result (Python quality for historical schema-1 runs), then retry push CI.
-For a managed release PR, rerun its authoritative dispatched CI, not the delegating PR run. GitHub permits reruns only within
-[30 days of the initial execution](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
-A partial rerun can reuse the quality job's record from the same run and immutable head.
+Choose the recovery path using the PR's state and evidence schema:
 
-When the original run is unavailable or can no longer be retried, use the fresh-validation
-procedure below. Before merging a long-lived PR whose original run can no longer be retried,
-push a new Conventional Commit to obtain fresh PR validation.
+| Situation | Recovery |
+| --- | --- |
+| Open PR, current schema-2 CI | Retry PR CI; for a managed release PR, retry its authoritative dispatch, not the delegating run. Ensure **CI result** runs after the selected quality jobs and uploads evidence for the current attempt. |
+| Merged PR, missing schema-2 evidence | Run fresh full CI on current main and explicitly select it with `recovery-run-id`, as shown below. Current PR validation requires an open PR, so rerunning the original PR workflow after merging cannot restore its evidence. |
+| Historical schema-1 CI | If the original workflow remains retryable, rerun its Python quality job to restore its record, then retry push CI. Otherwise use fresh main validation below. |
+
+Schema-2 evidence is written by **CI result** and bound to the run attempt. A partial retry must
+rerun that gate after the selected checks succeed; an artifact from an earlier attempt cannot be
+reused. Historical schema-1 workflows recorded evidence in Python quality and can reuse that record
+across partial retries of the same run and immutable head, provided all required jobs pass.
+
+GitHub permits reruns only within
+[30 days of the initial execution](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+Before merging a long-lived PR whose original run can no longer be retried, push a new Conventional
+Commit to obtain fresh PR validation. A changed PR head or base needs validation of that new state.
 
 The release gate checks out full Git history. Local merged-PR verification also requires a full
 checkout: for a shallow clone, run `git fetch --unshallow` before checking the integration. A shallow

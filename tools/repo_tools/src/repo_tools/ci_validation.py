@@ -7,14 +7,81 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from html import escape
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from repo_tools import github_checks as checks
 from repo_tools.github_api import api, items
 from repo_tools.release_changes import branch_at, managed_pr, release_changes, snapshot
 from repo_tools.repository_metadata import git
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    """Verified profile and authoritative run identity for reporting."""
+
+    profile: str
+    run_id: int
+    run_attempt: int
+
+
+def write_summary(
+    stage: str,
+    selected: dict[str, Any] | None = None,
+    *,
+    result: ValidationResult | None = None,
+    error: str | None = None,
+) -> None:
+    """Append informational Markdown without changing the validation outcome."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        lines = [f"## {escape(stage)}", ""]
+        if error is not None:
+            lines.extend(["**Validation failed.**", "", f"<pre>{escape(error)}</pre>", ""])
+        elif result is not None:
+            lines.extend(["**Validation passed.**", ""])
+        if isinstance(selected, dict):
+            delegated = selected.get("role") == "delegate"
+            profile = (
+                result.profile
+                if result
+                else (
+                    "Awaiting authoritative validation"
+                    if delegated
+                    else selected.get("profile", "Unknown")
+                )
+            )
+            fields = {
+                "Role": selected.get("role", "Unknown"),
+                "Profile": profile,
+                "Selection reason": selected.get("reason", "Unavailable"),
+                "Base commit": selected.get("base_sha") or "Not applicable",
+                "Head commit": selected.get("head_sha", "Unavailable"),
+            }
+            for label, value in fields.items():
+                value = escape(str(value).replace("\r", " ").replace("\n", " "))
+                lines.append(f"- {label}: <code>{value}</code>")
+            if result is not None:
+                server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+                repository = quote(str(selected["repository"]), safe="/")
+                url = (
+                    f"{server}/{repository}/actions/runs/{result.run_id}"
+                    f"/attempts/{result.run_attempt}"
+                )
+                action = "Reused" if delegated else "Performed validation in"
+                lines.append(
+                    f'- {action} <a href="{escape(url, quote=True)}">authoritative run '
+                    f"{result.run_id}, attempt {result.run_attempt}</a>."
+                )
+        with Path(path).open("a", encoding="utf-8") as stream:
+            stream.write("\n".join(lines) + "\n\n")
+    except (OSError, KeyError, TypeError, ValueError) as summary_error:
+        print(f"Could not write CI summary: {summary_error}", file=sys.stderr)
 
 
 def policy_at(root: Path, revision: str) -> dict[str, Any]:
@@ -224,11 +291,11 @@ def check_selected_jobs(
     required = profile_jobs(policy, profile) | {"CI context"}
     if gate:
         required.add("CI result")
-    checks.check_jobs(repository, run_id, required)
     inactive = (profile_jobs(policy, "full") | profile_jobs(policy, "release")) - required
     jobs = items(
         f"repos/{repository}/actions/runs/{run_id}/jobs?filter=latest&per_page=100", "jobs"
     )
+    checks.validate_jobs(jobs, run_id, required)
     for job in jobs:
         if job["name"] in inactive and job["conclusion"] != "skipped":
             raise ValueError(f"unexpected active job for {profile} CI: {job['name']}")
@@ -273,7 +340,7 @@ def newest_dispatch(repository: str, pr: dict[str, Any], workflow: int) -> dict[
     )
 
 
-def delegate(root: Path, selected: dict[str, Any], *, timeout: float = 35 * 60) -> None:
+def delegate(root: Path, selected: dict[str, Any], *, timeout: float = 35 * 60) -> ValidationResult:
     repository = selected["repository"]
     workflow = api(f"repos/{repository}/actions/workflows/ci.yml")["id"]
     deadline = time.monotonic() + timeout
@@ -304,7 +371,7 @@ def delegate(root: Path, selected: dict[str, Any], *, timeout: float = 35 * 60) 
             if current["base"]["sha"] != selected["base_sha"]:
                 raise ValueError("PR base advanced during delegated validation")
             print(f"Reused authoritative CI run {run['id']} ({evidence['profile']}).")
-            return
+            return ValidationResult(evidence["profile"], run["id"], run["run_attempt"])
         if time.monotonic() >= deadline:
             raise ValueError(
                 "authoritative CI did not finish; retry release preparation or its dispatched CI"
@@ -313,15 +380,14 @@ def delegate(root: Path, selected: dict[str, Any], *, timeout: float = 35 * 60) 
         time.sleep(min(30, max(0, deadline - time.monotonic())))
 
 
-def finish(root: Path, selected: dict[str, Any], output: Path) -> None:
+def finish(root: Path, selected: dict[str, Any], output: Path) -> ValidationResult:
     repository = os.environ["GITHUB_REPOSITORY"]
     if selected["repository"] != repository or selected["checkout_sha"] != os.environ["GITHUB_SHA"]:
         raise ValueError("CI context does not match this workflow")
     if git("rev-parse", "HEAD", root=root).strip() != selected["checkout_sha"]:
         raise ValueError("gate checkout does not match CI context")
     if selected["role"] == "delegate":
-        delegate(root, selected)
-        return
+        return delegate(root, selected)
     if selected["role"] != "authoritative":
         raise ValueError("unknown CI role")
     if selected["pr_number"]:
@@ -345,3 +411,6 @@ def finish(root: Path, selected: dict[str, Any], output: Path) -> None:
     if os.environ["GITHUB_EVENT_NAME"] != "push":
         checks.record(output, root=root, context=selected)
     print(f"CI result: {selected['profile']} validation passed.")
+    return ValidationResult(
+        selected["profile"], int(os.environ["GITHUB_RUN_ID"]), int(os.environ["GITHUB_RUN_ATTEMPT"])
+    )

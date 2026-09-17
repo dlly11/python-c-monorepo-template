@@ -260,6 +260,11 @@ def check_jobs(repository: str, run_id: int, required: set[str]) -> None:
     jobs = items(
         f"repos/{repository}/actions/runs/{run_id}/jobs?filter=latest&per_page=100", "jobs"
     )
+    validate_jobs(jobs, run_id, required)
+
+
+def validate_jobs(jobs: list[dict[str, Any]], run_id: int, required: set[str]) -> None:
+    """Validate required jobs against one fetched collection."""
     for name in sorted(required):
         matches = [job for job in jobs if job["name"] == name]
         if (

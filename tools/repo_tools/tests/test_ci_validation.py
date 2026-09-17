@@ -501,3 +501,123 @@ def test_profile_policy_is_validated(change):
         )
     with pytest.raises(ValueError):
         checks.validate_policy(policy)
+
+
+@pytest.mark.parametrize("profile", ["full", "release"])
+def test_selected_jobs_fetch_one_collection(ci_state, monkeypatch, profile):
+    jobs = [
+        {"name": name, "status": "completed", "conclusion": "success"}
+        for name in ["CI context", "CI result", *POLICY["validation"][profile]]
+    ]
+    reads = []
+
+    def items(endpoint, key=None):
+        reads.append((endpoint, key))
+        return jobs
+
+    monkeypatch.setattr(ci, "items", items)
+    monkeypatch.setattr(checks, "items", lambda *args: pytest.fail("duplicate job fetch"))
+    ci.check_selected_jobs(REPOSITORY, 100, POLICY, profile, gate=True)
+    assert reads == [
+        (f"repos/{REPOSITORY}/actions/runs/100/jobs?filter=latest&per_page=100", "jobs")
+    ]
+
+
+@pytest.mark.parametrize("profile", ["full", "release"])
+def test_context_and_result_summaries(ci_state, tmp_path, monkeypatch, profile):
+    ci_state["eligible"] = profile == "release"
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    assert cli.main(["check-ci-context"]) == 0
+    selected = ci.context(Path.cwd())
+    assert f"Profile: <code>{profile}</code>" in summary.read_text()
+    assert "Base commit: <code>base</code>" in summary.read_text()
+    assert "Head commit: <code>head</code>" in summary.read_text()
+    ci_state["jobs"] = [
+        {"name": name, "status": "completed", "conclusion": "success"}
+        for name in ["CI context", *POLICY["validation"][profile]]
+    ]
+    monkeypatch.setattr(checks, "record", lambda *args, **kw: None)
+    monkeypatch.setenv("CI_CONTEXT", json.dumps(selected))
+    monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.enterprise.invalid")
+    assert cli.main(["check-ci-result"]) == 0
+    output = summary.read_text()
+    assert "Validation passed" in output
+    assert "Performed validation" in output
+    assert "https://github.enterprise.invalid/owner/project/actions/runs/100/attempts/1" in output
+    assert "CI context" in output and "CI result" in output
+
+
+def test_delegate_summary_uses_verified_profile(ci_state, tmp_path, monkeypatch):
+    selected = ci.context(tmp_path)
+    selected.update(role="delegate", profile="release", reason="wait for dispatch")
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    ci.write_summary("CI context", selected)
+    assert "Awaiting authoritative validation" in summary.read_text()
+    assert "Profile: <code>release</code>" not in summary.read_text()
+    evidence = {"schema": 2, "profile": "full", "run_attempt": 1, "base_sha": "base"}
+    monkeypatch.setattr(checks, "check_evidence", lambda *args, **kw: evidence)
+    monkeypatch.setenv("CI_CONTEXT", json.dumps(selected))
+    assert cli.main(["check-ci-result"]) == 0
+    output = summary.read_text()
+    assert "Profile: <code>full</code>" in output
+    assert "Reused" in output and "authoritative run 100, attempt 1" in output
+
+
+@pytest.mark.parametrize("unwritable", [False, True])
+@pytest.mark.parametrize("success", [False, True])
+def test_summary_io_does_not_change_gate_result(
+    ci_state, tmp_path, monkeypatch, success, unwritable
+):
+    selected = ci.context(tmp_path)
+    selected["profile"] = "full"
+    monkeypatch.setenv("CI_CONTEXT", json.dumps(selected))
+    monkeypatch.setattr(checks, "record", lambda *args, **kw: None)
+    if unwritable:
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path))
+    else:
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    if not success:
+        ci_state["jobs"][-1]["conclusion"] = "failure"
+    assert cli.main(["check-ci-result"]) == (0 if success else 1)
+
+
+def test_failure_summary_escapes_diagnostics(ci_state, tmp_path, monkeypatch):
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    selected = ci.context(tmp_path)
+    selected["reason"] = '<script>alert("x")</script>\n# Heading'
+    monkeypatch.setenv("CI_CONTEXT", json.dumps(selected))
+    assert cli.main(["check-ci-result"]) == 1
+    output = summary.read_text()
+    assert "Validation failed" in output
+    assert "Release validation" in output
+    assert "<script>" not in output
+    assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; # Heading" in output
+    ci.write_summary("CI result", error="<img src=x>\nexplanation")
+    assert "&lt;img src=x&gt;\nexplanation" in summary.read_text()
+
+
+def test_context_failure_summary(ci_state, tmp_path, monkeypatch):
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    ci_state["pr"]["state"] = "closed"
+    assert cli.main(["check-ci-context"]) == 1
+    assert "PR must be open" in summary.read_text()
+    assert "Validation failed" in summary.read_text()
+
+
+def test_local_classification_does_not_write_summary(tmp_path, monkeypatch, capsys):
+    from repo_tools.commands import check_ci_context
+
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
+    monkeypatch.setattr(
+        check_ci_context, "release_changes", lambda *args: (False, "source changed")
+    )
+    assert cli.main(["check-ci-context", "--classify", "--base", "base", "--head", "head"]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "release_only": False,
+        "reason": "source changed",
+    }
+    assert not (tmp_path / "summary").exists()
