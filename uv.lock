@@ -802,7 +802,7 @@ provides-extras = ["commit"]
 
 [[package]]
 name = "monorepo-template-creator"
-version = "3.0.0"
+version = "3.0.1"
 source = { editable = "python/apps/template_creator" }
 dependencies = [
     { name = "tomlkit" },
@@ -982,7 +982,7 @@ wheels = [
 
 [[package]]
 name = "python-c-monorepo-template"
-version = "3.0.0"
+version = "3.0.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]

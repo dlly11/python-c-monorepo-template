@@ -1,5 +1,5 @@
 {
-  ".": "3.0.0",
+  ".": "3.0.1",
   "python/packages/core": "3.0.0",
   "python/packages/package_a": "3.0.0",
   "python/packages/package_b": "3.0.0",
