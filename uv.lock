@@ -366,12 +366,12 @@ wheels = [
 
 [[package]]
 name = "example-core"
-version = "1.2.0"
+version = "2.0.0"
 source = { editable = "python/packages/core" }
 
 [[package]]
 name = "example-package-a"
-version = "1.2.0"
+version = "2.0.0"
 source = { editable = "python/packages/package_a" }
 dependencies = [
     { name = "example-core" },
@@ -382,7 +382,7 @@ requires-dist = [{ name = "example-core", editable = "python/packages/core" }]
 
 [[package]]
 name = "example-package-a-cli"
-version = "1.2.0"
+version = "2.0.0"
 source = { editable = "python/apps/package_a_cli" }
 dependencies = [
     { name = "example-package-a" },
@@ -393,7 +393,7 @@ requires-dist = [{ name = "example-package-a", editable = "python/packages/packa
 
 [[package]]
 name = "example-package-b"
-version = "1.2.0"
+version = "2.0.0"
 source = { editable = "python/packages/package_b" }
 dependencies = [
     { name = "example-core" },
@@ -715,7 +715,7 @@ source = { editable = "tools/repo_tools" }
 
 [[package]]
 name = "monorepo-template-creator"
-version = "1.2.0"
+version = "2.0.0"
 source = { editable = "python/apps/template_creator" }
 dependencies = [
     { name = "tomlkit" },
@@ -883,7 +883,7 @@ wheels = [
 
 [[package]]
 name = "python-c-monorepo-template"
-version = "1.2.0"
+version = "2.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
