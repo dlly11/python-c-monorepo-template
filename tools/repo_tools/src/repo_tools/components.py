@@ -84,7 +84,11 @@ def configured_components(config: dict[str, Any]) -> tuple[Component, ...]:
         if not isinstance(entry, dict):
             raise ValueError(f"{path}: expected a release configuration object")
         settings = {**config, **entry}
+        # An unnamed root is required for root-only combined PRs to publish with
+        # unprefixed tags. Keep its local CLI/scope identity independent of that.
         identifier = settings.get("component", "")
+        if path == "." and identifier == "":
+            identifier = "template"
         if not isinstance(identifier, str) or not COMPONENT_ID.fullmatch(identifier):
             raise ValueError(f"{path}: declare a lowercase hyphen-separated component ID")
         strategy = settings.get("release-type")

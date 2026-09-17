@@ -244,3 +244,21 @@ def test_member_cannot_reuse_root_distribution_name(workspace: tuple[ModuleType,
     assert "workspace distribution names: duplicate sample-template" in module.workspace_errors(
         root
     )
+
+
+@pytest.mark.parametrize("field", ["component", "package-name"])
+def test_named_root_release_rejected(independent_repository: Path, field: str) -> None:
+    with (independent_repository / "pyproject.toml").open("a") as stream:
+        stream.write(
+            '\n[tool.coverage.run]\nsource = ["sample_core"]\n'
+            '[tool.ruff.lint.isort]\nknown-first-party = ["sample_core", "repo_tools"]\n'
+        )
+    config_path = independent_repository / check_workspace.RELEASE_CONFIG
+    config = json.loads(config_path.read_text())
+    config["packages"]["."].update({"component": "", "package-name": ""})
+    config["packages"]["."][field] = "template"
+    config_path.write_text(json.dumps(config))
+    assert any(
+        "template-only combined release PRs cannot publish" in error
+        for error in check_workspace.workspace_errors(independent_repository)
+    )

@@ -157,3 +157,64 @@ def test_pr_cli_publishes_validated_title(
         == 0
     )
     assert output.read_text() == f"title={release_pr['title']}\n"
+
+
+@pytest.mark.parametrize("change", ["pending", "unmerged", "tagged", "other-base", "issue"])
+def test_unpublished_release_guard(
+    change: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/project")
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    issue = {"number": 52, "pull_request": {}}
+    pr = {
+        "number": 52,
+        "merged_at": "2026-09-17T23:05:45Z",
+        "base": {"ref": "main"},
+        "labels": [{"name": "autorelease: pending"}],
+    }
+    if change == "unmerged":
+        pr["merged_at"] = None
+    elif change == "tagged":
+        pr["labels"] = [{"name": "autorelease: tagged"}]
+    elif change == "other-base":
+        pr["base"] = {"ref": "maintenance"}
+    elif change == "issue":
+        issue.pop("pull_request")
+    monkeypatch.setattr(automation, "items", lambda _: [issue])
+    monkeypatch.setattr(automation, "api", lambda _: pr)
+    assert cli.main(["check-release-automation", "--check-pending"]) == int(change == "pending")
+    if change == "pending":
+        assert "https://github.com/owner/project/pull/52" in capsys.readouterr().err
+        assert "Release preparation blocked" in summary.read_text()
+    else:
+        assert not summary.exists()
+
+
+def test_unpublished_release_guard_no_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
+    def candidates(endpoint: str):
+        assert "state=closed" in endpoint
+        assert "labels=autorelease%3A%20pending" in endpoint
+        return []
+
+    monkeypatch.setattr(automation, "items", candidates)
+    automation.require_no_pending_releases("owner/project")
+
+
+def test_unpublished_release_guard_api_error_fails(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/project")
+
+    def fail(endpoint):
+        raise RuntimeError("GitHub is unavailable")
+
+    monkeypatch.setattr(automation, "items", fail)
+    assert cli.main(["check-release-automation", "--check-pending"]) == 1
+    assert "GitHub is unavailable" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flag", ["--branch", "--expected-head"])
+def test_pending_guard_rejects_pr_arguments(flag, monkeypatch):
+    assert cli.main(["check-release-automation", "--check-pending", flag, "unused"]) == 1

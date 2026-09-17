@@ -69,6 +69,15 @@ def workspace_errors(root: Path) -> list[str]:
         if not legacy_config(release):
             components = configured_components(release)
             scope_policy(root)
+            root_release = release["packages"].get(".")
+            if root_release is not None and any(
+                {**release, **root_release}.get(name) != ""
+                for name in ("component", "package-name")
+            ):
+                errors.append(
+                    "the unprefixed root release must have empty component and package-name; "
+                    "otherwise template-only combined release PRs cannot publish"
+                )
             errors.extend(
                 registration_errors(
                     "Python release ownership",
