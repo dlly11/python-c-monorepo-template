@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.1...v2.0.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* **creator:** preserve uv diagnostics and clarify CI recovery ([1756a00](https://github.com/dlly11/python-c-monorepo-template/commit/1756a0001ab299ec0b375bf995513ebddb84ab63))
+
 ## [2.0.1](https://github.com/dlly11/python-c-monorepo-template/compare/v2.0.0...v2.0.1) (2026-09-17)
 
 
