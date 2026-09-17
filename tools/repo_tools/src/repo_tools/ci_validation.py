@@ -33,7 +33,7 @@ def write_summary(
     selected: dict[str, Any] | None = None,
     *,
     result: ValidationResult | None = None,
-    error: str | None = None,
+    error: str | Exception | None = None,
 ) -> None:
     """Append informational Markdown without changing the validation outcome."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -42,7 +42,11 @@ def write_summary(
     try:
         lines = [f"## {escape(stage)}", ""]
         if error is not None:
-            lines.extend(["**Validation failed.**", "", f"<pre>{escape(error)}</pre>", ""])
+            lines.extend(["**Validation failed.**", "", f"<pre>{escape(str(error))}</pre>", ""])
+            if isinstance(error, checks.JobValidationError):
+                for name, url in error.links:
+                    lines.append(f'- <a href="{escape(url, quote=True)}">{escape(name)} logs</a>')
+                lines.append("")
         elif result is not None:
             lines.extend(["**Validation passed.**", ""])
         if isinstance(selected, dict):

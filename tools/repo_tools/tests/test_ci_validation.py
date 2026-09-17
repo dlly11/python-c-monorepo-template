@@ -17,6 +17,34 @@ REPOSITORY = "owner/project"
 POLICY = {"validation": {"full": ["Tests", "Build"], "release": ["Release validation"]}}
 
 
+def test_failed_jobs_explain_all_failures_and_link_logs(tmp_path, monkeypatch):
+    jobs: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": f"https://github.com/owner/project/actions/runs/100/job/{number}",
+            "steps": [{"name": "Build <creator>", "conclusion": "failure"}],
+        }
+        for number, name in enumerate(["Windows ARM", "Windows x64"], start=1)
+    ]
+    with pytest.raises(checks.JobValidationError) as caught:
+        checks.validate_jobs(jobs, 100, {"Windows ARM", "Windows x64", "Missing"})
+    message = str(caught.value)
+    assert "Missing: expected one job, found 0" in message
+    for job in jobs:
+        assert f"{job['name']}: status=completed, conclusion=failure" in message
+        assert job["html_url"] in message
+    assert message.count("failed steps: Build <creator>") == 2
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    ci.write_summary("CI result", error=caught.value)
+    content = summary.read_text()
+    assert "Build &lt;creator&gt;" in content
+    for job in jobs:
+        assert f'<a href="{job["html_url"]}">{job["name"]} logs</a>' in content
+
+
 @pytest.fixture
 def ci_state(tmp_path, monkeypatch):
     branch = release_branch(

@@ -620,6 +620,42 @@ def test_cli_errors_and_wizard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert cli.main(["wizard", "--config", str(tmp_path / "config")]) == 0
 
 
+@pytest.mark.parametrize("encoding", ["cp1252", "ascii", "utf-8"])
+@pytest.mark.parametrize("command", ["validate", "preview", "error"])
+def test_cli_unicode_output(
+    recipe: dict[str, Any], tmp_path: Path, encoding: str, command: str
+) -> None:
+    name = "Research 研究 🚀"
+    recipe["project"]["name"] = name
+    path = tmp_path / "recipe.toml"
+    save(Config(recipe), path)
+    original = path.read_bytes()
+    arguments = ["validate", "--config", str(path)]
+    if command == "preview":
+        arguments = [
+            "generate",
+            "--config",
+            str(path),
+            "--output",
+            str(tmp_path / name),
+            "--dry-run",
+        ]
+    elif command == "error":
+        arguments = ["validate", "--config", str(tmp_path / name)]
+    result = subprocess.run(
+        [sys.executable, "-m", "template_creator", *arguments],
+        env={**os.environ, "PYTHONIOENCODING": encoding + ":strict"},
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == (1 if command == "error" else 0)
+    output = (result.stderr if command == "error" else result.stdout).decode(encoding)
+    assert name.encode(encoding, errors="backslashreplace").decode(encoding) in output
+    assert "UnicodeEncodeError" not in output and "charmap" not in output
+    assert path.read_bytes() == original
+
+
 def test_module_help(monkeypatch: pytest.MonkeyPatch) -> None:
     import runpy
     import sys

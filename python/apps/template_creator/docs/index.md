@@ -130,6 +130,10 @@ Human-readable names may contain
 Unicode and punctuation. GitHub identities and CODEOWNERS are syntax-checked locally; users
 must still configure their actual repositories and grant owners access.
 
+If the terminal or redirected output uses an encoding that cannot display a character, the
+creator prints its backslash escape instead. Saved recipes and generated files retain the original
+Unicode text in UTF-8.
+
 The public author email must be a valid package-author mailbox. Ordinary addresses,
 plus-addressed emails such as `ada+research@example.com`, and personal GitHub noreply addresses
 are supported. The unquoted `41898282+github-actions[bot]@users.noreply.github.com` address used

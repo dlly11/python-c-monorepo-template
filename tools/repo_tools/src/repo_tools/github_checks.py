@@ -263,16 +263,43 @@ def check_jobs(repository: str, run_id: int, required: set[str]) -> None:
     validate_jobs(jobs, run_id, required)
 
 
+class JobValidationError(ValueError):
+    """Failed required jobs, with links for the CI summary."""
+
+    def __init__(self, message: str, links: list[tuple[str, str]]) -> None:
+        super().__init__(message)
+        self.links = links
+
+
 def validate_jobs(jobs: list[dict[str, Any]], run_id: int, required: set[str]) -> None:
     """Validate required jobs against one fetched collection."""
+    failures = []
+    links = []
     for name in sorted(required):
         matches = [job for job in jobs if job["name"] == name]
-        if (
-            len(matches) != 1
-            or matches[0]["status"] != "completed"
-            or matches[0]["conclusion"] != "success"
-        ):
-            raise ValueError(f"CI run {run_id}: required CI job {name!r} did not pass")
+        if len(matches) != 1:
+            failures.append(f"{name}: expected one job, found {len(matches)}")
+            continue
+        job = matches[0]
+        if job["status"] == "completed" and job["conclusion"] == "success":
+            continue
+        detail = f"{name}: status={job['status']}, conclusion={job['conclusion']}"
+        steps = [
+            step["name"]
+            for step in job.get("steps", [])
+            if step.get("conclusion") in {"failure", "cancelled", "timed_out"}
+        ]
+        if steps:
+            detail += "; failed steps: " + ", ".join(steps)
+        url = job.get("html_url")
+        if isinstance(url, str) and url.startswith("https://"):
+            detail += f"\n  Logs: {url}"
+            links.append((name, url))
+        failures.append(detail)
+    if failures:
+        raise JobValidationError(
+            f"CI run {run_id}: required CI jobs did not pass:\n" + "\n".join(failures), links
+        )
 
 
 def check_evidence(
