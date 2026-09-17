@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from repo_tools.conventional_commits import check_message
+from repo_tools.conventional_commits import check_commit, check_message
 from repo_tools.repository_metadata import git
 
 
@@ -46,8 +46,7 @@ def execute(args: argparse.Namespace, *, root: Path | None = None) -> int:
         commits = commits_between(args.base, args.head, root=root)
         failures = 0
         for commit in commits:
-            message = git("show", "--no-patch", "--format=%B", commit, "--", root=root)
-            failures += not check_message(message, commit[:12], root=root, revision=commit)
+            failures += not check_commit(commit, base=args.base, root=root)
         print(f"Checked {len(commits)} commit(s); {failures} invalid subject(s).")
         return int(failures != 0)
     except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as error:
