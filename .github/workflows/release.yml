@@ -71,7 +71,7 @@ jobs:
       - name: Create repository-scoped release App token
         if: steps.automation.outputs.auth-mode == 'app'
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -181,7 +181,7 @@ jobs:
       - name: Create repository-scoped release App token
         if: steps.automation.outputs.auth-mode == 'app'
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -227,7 +227,7 @@ jobs:
 
       - name: Install uv
         if: steps.release.outputs.prs_created == 'true'
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
 
@@ -327,7 +327,7 @@ jobs:
           ref: ${{ needs.release-please.outputs.tooling-sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Build, check, and upload released Python distributions
         env:
           GH_TOKEN: ${{ github.token }}
@@ -389,7 +389,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.release-please.outputs.tag-name }}
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: '3.12'
       - run: uv sync --locked --all-packages --group creator-build
